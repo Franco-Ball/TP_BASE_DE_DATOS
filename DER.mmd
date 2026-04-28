@@ -1,0 +1,238 @@
+---
+config:
+  theme: dark
+  layout: elk
+---
+erDiagram
+	direction TB
+    Agencia{
+        bigint agen_numero pk
+        nvarchar(255) agen_direccion
+        nvarchar(255) agen_telefono
+        nvarchar(255) agen_mail
+        nvarchar(255) agen_localidad
+        nvarchar(255) agen_provincia
+    }
+    Agente{
+        bigint agen_legajo pk
+        bigint agen_agencia fk
+        nvarchar(255) agen_nombre
+        nvarchar(255) agen_apellido
+        nvarchar(255) agen_dni
+        date agen_fecha_nacimiento
+        nvarchar(255) agen_telefono
+        nvarchar(255) agen_mail
+        nvarchar(255) agen_direccion
+        nvarchar(255) agen_localidad
+        nvarchar(255) agen_provincia
+    }
+
+    Cliente{
+        nvarchar(255) clie_nombre
+        nvarchar(255) clie_apellido
+        nvarchar(255) clie_dni pk
+        nvarchar(255) clie_telefono
+        nvarchar(255) clie_mail
+        nvarchar(255) clie_direccion
+        date clie_fecha_nacimiento
+        nvarchar(255) clie_localidad
+        nvarchar(255) clie_provincia
+    }
+	Venta {
+		bigint vent_codigo PK ""  
+		bigint vent_agencia FK ""  
+		nvarchar(255) vent_cliente FK ""  
+		bigint vent_agente FK ""  
+        bigint vent_propuesta 
+		date vent_fecha  ""  
+		nvarchar(255) vent_canal_venta  ""  
+		decimal vent_subtotal  ""  
+		decimal vent_descuento  ""  
+		decimal vent_importe_total  ""  
+		nvarchar(255) vent_medio_pago  ""  
+	}
+
+	ItemVentaVuelo {
+		bigint item_venta FK ""  
+		bigint item_vuelo FK ""  
+		decimal item_precio_unitario  "" 
+        int vuel_cant_pasajes  ""  
+		nvarchar(255) item_cod_reserva  "" 
+        decimal item_subtotal 
+	}
+
+	Vuelo {
+		bigint vuel_codigo PK ""  
+		char(50) vuel_detalle  "" 
+		decimal vuel_precio  ""  
+		nvarchar(10) vuel_aeropuerto_salida  ""  
+        nvarchar(10) vuel_aeropuerto_llegada  "" 
+		date vuel_fecha_salida  ""  
+		nvarchar(50) vuel_horario_salida  ""  
+		date vuel_fecha_llegada  ""  
+		nvarchar(50) vuel_horario_llegada  ""  
+		nvarchar(255) aerolinea FK "" 
+        bit vuel_incluye_carry
+        bit vuel_incluye_valija
+	}
+    Aerolinea{
+        nvarchar(255) aero_nombre
+        nvarchar(255) aero_codigo
+        nvarchar(255) aero_pais
+        nvarchar(255) aero_alianza
+    }
+    Aeropuerto{
+        nvarchar(10) aero_codigo
+        nvarchar(200) aero_descripcion
+        nvarchar(255) aero_ciudad
+        nvarchar(255) aero_pais
+    }
+
+	ItemVentaHospedaje {
+		bigint item_venta FK ""  
+		bigint item_hospedaje FK ""  
+		bigint item_habitacion FK ""  
+		date item_desde  ""  
+		date item_hasta ""  
+		int item_hospedaje_cantidad  ""
+		decimal item_precio_unitario  ""
+        decimal item_subtotal
+		nvarchar(255) item_cod_reserva  ""  
+	}
+
+	Hospedaje {
+		bigint hosp_codigo PK ""
+        nvarchar(255) hosp_ciudad
+        nvarchar(255) hosp_pais
+        nvarchar(255) hosp_nombre  
+		nvarchar(255) hosp_direccion  "" 
+        bit hosp_incluye_desayuno 
+        nvarchar(50) hosp_hora_check_in  ""  
+		nvarchar(50) hosp_hora_check_out  "" 
+	}
+
+	HabitacionHospedaje {
+		bigint habi_codigo_habitacion PK ""  
+		bigint habi_hospedaje FK ""
+        nvarchar(255) habi_nombre  
+		nvarchar(max) habi_descripcion  ""  
+		decimal habi_precio_noche  ""  
+		 
+	}
+
+	ItemVentaExcursion {
+		bigint item_venta FK ""  
+		bigint item_excursion FK ""  
+		smalldatetime item_fecha  ""  
+		int item_cant  ""  
+		decimal item_precio  ""  
+		varchar(255) item_cod_reserva  ""  
+	}
+
+	Excursion {
+		bigint excu_codigo pk "" 
+        nvarchar(255) excu_nombre
+        nvarchar(max) excu_descripcion 
+		nvarchar(50) excu_horario  ""  
+		int excu_duracion  ""   
+        decimal excu_precio
+        bigint excu_proveedor
+	}
+    Proveedor{
+        bigint prov_codigo pk
+        nvarchar(255) prov_nombre
+        nvarchar(255) prov_mail
+        nvarchar(255) prov_telefono
+    }
+	Solicitud {
+		bigint soli_numero pk ""  
+		nvarchar(255) soli_cliente fk ""  
+		date soli_fecha  ""  
+		date soli_inicio_tentativa  ""  
+		date soli_fin_tentativa  ""  
+		int soli_cant_pas  ""  
+		nvarchar(max) soli_observaciones  ""  
+		decimal soli_presupuesto_estimado  ""  
+		bigint soli_agente fk ""  
+	}
+
+	CiudadSolicitud {
+		bigint ciud_numero fk ""  
+		nvarchar(255) ciud_detalle  ""  
+		int ciud_cant_dias  ""  
+		nvarchar(max) ciud_observaciones  ""  
+	}
+
+    Propuesta{
+        bigint prop_codigo pk
+        bigint prop_solicitud
+        bigint prop_agente
+        date prop_fecha_emision
+        date prop_vigencia
+        date prop_fecha_desde
+        date prop_fecha_hasta
+        decimal prop_subtotal
+        decimal prop_descuento
+        decimal prop_importe_total
+        nvarchar(255) prop_estado
+    }
+
+    ItemPropuestaVuelo{
+        bigint item_propuesta fk
+        bigint item_vuelo fk
+        int item_cant_pasajes
+        decimal item_precio_unitario
+        decimal item_subtotal
+    }
+
+    ItemPropuestaHospedaje{
+        bigint item_propuesta fk
+        bigint item_hospedaje fk
+        bigint item_habitacion fk
+        date item_ingreso  ""  
+		date item_egreso  ""  
+		int item_cant_habitaciones  ""  
+		decimal subtotal  ""  
+    }
+
+    Encuesta{
+        bigint encu_codigo pk
+        date encu_fecha
+        bigint encu_cliente fk
+        bigint encu_agente fk
+        nvarchar(max) encu_comentario
+    }
+    Aspecto{
+        bigint aspe_encuesta
+        nvarchar(255) aspe_detalle
+        int aspe_puntaje
+    }
+
+    Agencia ||--o{ Venta : ""
+    Cliente ||--o{ Venta : ""
+    Agente ||--o{ Venta : ""
+    Aerolinea ||--|{ Vuelo:""
+    Aeropuerto ||--o{ Vuelo : "origen"
+    Aeropuerto ||--o{ Vuelo : "destino"
+    Excursion }|--|| Proveedor:""
+    Agente ||--o{ Propuesta: ""
+    Cliente ||--o{ Solicitud:""
+    Agente ||--o{ Solicitud:""
+    Agencia ||--|{ Agente:""
+    Encuesta }o--|| Agente:""
+    Encuesta }o--|| Cliente:""
+    Encuesta ||--|{ Aspecto:""
+    Propuesta |o--o| Venta:""
+    Propuesta ||--o{ ItemPropuestaVuelo:""
+    ItemPropuestaVuelo }o--|| Vuelo:""
+    Propuesta ||--o{ ItemPropuestaHospedaje:""
+    ItemPropuestaHospedaje }o--|| Hospedaje:""
+    Solicitud ||--|{ Propuesta: ""
+    Solicitud ||--|{ CiudadSolicitud:""
+	Hospedaje||--|{HabitacionHospedaje:"  "
+	Venta||--o{ItemVentaVuelo:"  "
+	Venta||--o{ItemVentaHospedaje:"  "
+	Venta||--o{ItemVentaExcursion:"  "
+	Vuelo||--o{ItemVentaVuelo:"  "
+	Hospedaje||--o{ItemVentaHospedaje:"  "
+	Excursion||--o{ItemVentaExcursion:"  "
