@@ -8,13 +8,22 @@ config:
 ---
 erDiagram
 	direction TB
+    Provincia {
+        bigint prov_codigo pk
+        nvarchar(255) prov_nombre
+        bigint prov_pais fk
+    }
+    Localidad {
+        bigint loca_codigo pk
+        nvarchar(255) loca_nombre
+        bigint loca_provincia fk
+    }
     Agencia{
         bigint agen_numero pk
         nvarchar(255) agen_direccion
         nvarchar(255) agen_telefono
         nvarchar(255) agen_mail
-        nvarchar(255) agen_localidad
-        nvarchar(255) agen_provincia
+        bigint agen_localidad fk
     }
     Agente{
         bigint agen_legajo pk
@@ -26,8 +35,7 @@ erDiagram
         nvarchar(255) agen_telefono
         nvarchar(255) agen_mail
         nvarchar(255) agen_direccion
-        nvarchar(255) agen_localidad
-        nvarchar(255) agen_provincia
+        bigint agen_localidad fk
     }
 
     Cliente{
@@ -38,22 +46,31 @@ erDiagram
         nvarchar(255) clie_mail
         nvarchar(255) clie_direccion
         date clie_fecha_nacimiento
-        nvarchar(255) clie_localidad
-        nvarchar(255) clie_provincia
+        bigint clie_localidad fk
+    }
+    CanalVenta {
+        bigint cana_codigo pk
+        nvarchar(255) cana_nombre
+    }
+    MedioPago {
+        bigint medi_codigo pk
+        nvarchar(255) medi_nombre
     }
 	Venta {
 		bigint vent_codigo PK ""  
-		bigint vent_agencia FK ""  
 		nvarchar(255) vent_cliente FK ""  
 		bigint vent_agente FK ""  
-        bigint vent_propuesta 
 		date vent_fecha  ""  
-		nvarchar(255) vent_canal_venta  ""  
+		bigint vent_canal_venta fk 
 		decimal vent_subtotal  ""  
 		decimal vent_descuento  ""  
 		decimal vent_importe_total  ""  
-		nvarchar(255) vent_medio_pago  ""  
+		bigint vent_medio_pago fk 
 	}
+    Venta_Propuesta {
+        bigint vpro_venta fk
+        bigint vpro_propuesta fk
+    }
 
 	ItemVentaVuelo {
 		bigint item_venta FK ""  
@@ -78,17 +95,29 @@ erDiagram
         bit vuel_incluye_carry
         bit vuel_incluye_valija
 	}
+    Pais {
+        bigint pais_codigo pk
+        nvarchar(255) pais_nombre
+    }
+    Ciudad {
+        bigint ciud_codigo pk
+        nvarchar(255) ciud_nombre
+        bigint ciud_pais fk
+    }
+    Alianza {
+        bigint alia_codigo pk
+        nvarchar(255) alia_nombre
+    }
     Aerolinea{
         nvarchar(255) aero_nombre
         nvarchar(255) aero_codigo
-        nvarchar(255) aero_pais
-        nvarchar(255) aero_alianza
+        bigint aero_pais fk
+        bigint aero_alianza fk
     }
     Aeropuerto{
         nvarchar(10) aero_codigo
         nvarchar(200) aero_descripcion
-        nvarchar(255) aero_ciudad
-        nvarchar(255) aero_pais
+        bigint aero_ciudad fk
     }
 
 	ItemVentaHospedaje {
@@ -105,8 +134,7 @@ erDiagram
 
 	Hospedaje {
 		bigint hosp_codigo PK ""
-        nvarchar(255) hosp_ciudad
-        nvarchar(255) hosp_pais
+        bigint hosp_ciudad fk
         nvarchar(255) hosp_nombre  
 		nvarchar(255) hosp_direccion  "" 
         bit hosp_incluye_desayuno 
@@ -166,10 +194,14 @@ erDiagram
 		nvarchar(max) ciud_observaciones  ""  
 	}
 
+    EstadoPropuesta {
+        bigint esta_codigo pk
+        nvarchar(255) esta_nombre
+    }
     Propuesta{
         bigint prop_codigo pk
-        bigint prop_solicitud
-        bigint prop_agente
+        bigint prop_solicitud fk
+        bigint prop_agente fk
         date prop_fecha_emision
         date prop_vigencia
         date prop_fecha_desde
@@ -177,7 +209,7 @@ erDiagram
         decimal prop_subtotal
         decimal prop_descuento
         decimal prop_importe_total
-        nvarchar(255) prop_estado
+        bigint prop_estado fk
     }
 
     ItemPropuestaVuelo{
@@ -211,7 +243,6 @@ erDiagram
         int aspe_puntaje
     }
 
-    Agencia ||--o{ Venta : ""
     Cliente ||--o{ Venta : ""
     Agente ||--o{ Venta : ""
     Aerolinea ||--|{ Vuelo:""
@@ -225,7 +256,6 @@ erDiagram
     Encuesta }o--|| Agente:""
     Encuesta }o--|| Cliente:""
     Encuesta ||--|{ Aspecto:""
-    Propuesta |o--o| Venta:""
     Propuesta ||--o{ ItemPropuestaVuelo:""
     ItemPropuestaVuelo }o--|| Vuelo:""
     Propuesta ||--o{ ItemPropuestaHospedaje:""
@@ -239,3 +269,18 @@ erDiagram
 	Vuelo||--o{ItemVentaVuelo:"  "
 	Hospedaje||--o{ItemVentaHospedaje:"  "
 	Excursion||--o{ItemVentaExcursion:"  "
+    Pais ||--|{ Provincia : ""
+    Provincia ||--|{ Localidad : ""
+    Localidad ||--o{ Agencia : ""
+    Localidad ||--o{ Agente : ""
+    Localidad ||--o{ Cliente : ""
+    Pais ||--|{ Ciudad : ""
+    Ciudad ||--o{ Aeropuerto : ""
+    Ciudad ||--o{ Hospedaje : ""
+    Pais ||--o{ Aerolinea : ""
+    Alianza ||--o{ Aerolinea : ""
+    CanalVenta ||--o{ Venta : ""
+    MedioPago ||--o{ Venta : ""
+    EstadoPropuesta ||--o{ Propuesta : ""
+    Venta ||--o| Venta_Propuesta : ""
+    Propuesta ||--o| Venta_Propuesta : ""
