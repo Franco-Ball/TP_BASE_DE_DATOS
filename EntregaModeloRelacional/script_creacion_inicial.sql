@@ -203,7 +203,7 @@ CREATE TABLE [BASADOS_DE_DATOS].Encuesta (
 
 
 CREATE TABLE [BASADOS_DE_DATOS].CiudadSolicitud (
-    ciud_numero BIGINT primary key,
+    ciud_numero BIGINT,
     ciud_detalle NVARCHAR(255),
     ciud_cant_dias INT,
     ciud_observaciones NVARCHAR(MAX),
@@ -469,6 +469,8 @@ left join [BASADOS_DE_DATOS].Ciudad on Hospedaje_Ciudad=ciud_nombre
 left join [BASADOS_DE_DATOS].Pais on Hospedaje_Pais=pais_nombre
 left join [BASADOS_DE_DATOS].Hospedaje 
 on Hospedaje_Nombre = hosp_nombre and Hospedaje_Direccion = hosp_direccion
+and Hospedaje_Check_In = hosp_hora_check_in and Hospedaje_Check_Out = hosp_hora_check_out
+and Hospedaje_Incluye_Desayuno = hosp_incluye_desayuno
 and ciud_codigo = hosp_ciudad
 where ciud_pais=pais_codigo and Habitacion_Nombre is not null
 
@@ -654,6 +656,8 @@ left join [BASADOS_DE_DATOS].Pais on Hospedaje_Pais=pais_nombre and pais_codigo=
 left join [BASADOS_DE_DATOS].HabitacionHospedaje on hosp_codigo = habi_hospedaje and Habitacion_Nombre = habi_nombre 
 and Habitacion_Descripcion = habi_descripcion and Habitacion_Precio_Noche = habi_precio_noche
 where ciud_codigo = hosp_ciudad and Venta_Nro_Venta is not null and hosp_codigo is not null
+and Hospedaje_Nombre = hosp_nombre and Hospedaje_Check_In = hosp_hora_check_in
+and Hospedaje_Check_Out = hosp_hora_check_out and Hospedaje_Incluye_Desayuno = hosp_incluye_desayuno
 
 insert into [BASADOS_DE_DATOS].ItemVentaExcursion(
     item_venta,
@@ -706,5 +710,6 @@ left join [BASADOS_DE_DATOS].HabitacionHospedaje on hosp_codigo = habi_hospedaje
 and Habitacion_Descripcion = habi_descripcion and Habitacion_Precio_Noche = habi_precio_noche
 where ciud_codigo = hosp_ciudad and Propuesta_Nro_Propuesta is not null and hosp_codigo is not null 
 and Detalle_Propuesta_Hospedaje_Precio is not null
-
+and Hospedaje_Nombre = hosp_nombre and Hospedaje_Check_In = hosp_hora_check_in
+and Hospedaje_Check_Out = hosp_hora_check_out and Hospedaje_Incluye_Desayuno = hosp_incluye_desayuno
 go
