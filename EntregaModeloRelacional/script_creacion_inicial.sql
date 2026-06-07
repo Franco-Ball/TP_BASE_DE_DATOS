@@ -308,26 +308,26 @@ go
 
 WITH PaisesUnificados AS (
 
-    SELECT Aeropuerto_Salida_Pais  AS Nombre_Pais 
+    SELECT Aeropuerto_Salida_Pais AS Nombre_Pais 
     FROM gd_esquema.Maestra 
     WHERE Aeropuerto_Salida_Pais IS NOT NULL
     UNION 
-    SELECT Aeropuerto_Llegada_Pais  AS Nombre_Pais 
+    SELECT Aeropuerto_Llegada_Pais AS Nombre_Pais 
     FROM gd_esquema.Maestra 
     WHERE Aeropuerto_Llegada_Pais IS NOT NULL
     union 
-    SELECT Aerolinea_Pais  AS  Nombre_Pais 
+    SELECT Aerolinea_Pais AS Nombre_Pais 
     FROM gd_esquema.Maestra 
     WHERE Aerolinea_Pais IS NOT NULL
     union
-    SELECT Hospedaje_Pais  AS Nombre_Pais 
+    SELECT Hospedaje_Pais AS Nombre_Pais 
     FROM gd_esquema.Maestra 
     WHERE Hospedaje_Pais IS NOT NULL
 
 )
 
 insert into [BASADOS_DE_DATOS].Pais (pais_nombre)
-select distinct Nombre_Pais from PaisesUnificados
+select distinct Nombre_Pais COLLATE Latin1_General_CI_AI from PaisesUnificados
 
 insert into [BASADOS_DE_DATOS].CanalVenta (cana_nombre)
 select distinct Venta_Canal_Venta from gd_esquema.Maestra
@@ -357,7 +357,7 @@ with Ciudad_Pais AS (
 )
 
 insert into [BASADOS_DE_DATOS].Ciudad
-select ciudad, pais_codigo from Ciudad_Pais left join [BASADOS_DE_DATOS].Pais on pais=pais_nombre
+select ciudad, pais_codigo from Ciudad_Pais left join [BASADOS_DE_DATOS].Pais on pais COLLATE Latin1_General_CI_AI = pais_nombre COLLATE Latin1_General_CI_AI
 where pais_codigo is not null
 
 insert into [BASADOS_DE_DATOS].Proveedor
@@ -398,7 +398,7 @@ select distinct localidad, prov_codigo from Provincia_Localidad left join [BASAD
 
 insert into [BASADOS_DE_DATOS].Aerolinea
 select distinct Aerolinea_Codigo, Aerolinea_Nombre, pais_codigo, alia_codigo from gd_esquema.Maestra
-left join [BASADOS_DE_DATOS].Pais on Aerolinea_Pais=pais_nombre
+left join [BASADOS_DE_DATOS].Pais on Aerolinea_Pais COLLATE Latin1_General_CI_AI = pais_nombre COLLATE Latin1_General_CI_AI
 left join [BASADOS_DE_DATOS].Alianza on Aerolinea_Alianza = alia_nombre
 where Aerolinea_Codigo is not null;
 
@@ -422,7 +422,7 @@ insert into [BASADOS_DE_DATOS].Aeropuerto
 select distinct aeropuerto_codigo, aeropuerto_descripcion, ciud_codigo from AeropuertosUnificados
 left join [BASADOS_DE_DATOS].Ciudad on aeropuerto_ciudad=ciud_nombre
 left join [BASADOS_DE_DATOS].Pais on ciud_pais = pais_codigo
-where pais_nombre=aeropuerto_pais
+where pais_nombre COLLATE Latin1_General_CI_AI = aeropuerto_pais COLLATE Latin1_General_CI_AI
 
 insert into [BASADOS_DE_DATOS].Hospedaje(
     hosp_ciudad, 
@@ -436,7 +436,7 @@ select distinct ciud_codigo, Hospedaje_Nombre, Hospedaje_Direccion, Hospedaje_In
 from gd_esquema.Maestra
 left join [BASADOS_DE_DATOS].Ciudad on Hospedaje_Ciudad=ciud_nombre
 left join [BASADOS_DE_DATOS].Pais on ciud_pais = pais_codigo
-where Hospedaje_Nombre is not null and Hospedaje_Pais = pais_nombre
+where Hospedaje_Nombre is not null and Hospedaje_Pais COLLATE Latin1_General_CI_AI = pais_nombre COLLATE Latin1_General_CI_AI
 
 
 insert into [BASADOS_DE_DATOS].Excursion(
@@ -466,7 +466,7 @@ habi_precio_noche
 select distinct hosp_codigo, Habitacion_Nombre, Habitacion_Descripcion, Habitacion_Precio_Noche
 from gd_esquema.Maestra 
 left join [BASADOS_DE_DATOS].Ciudad on Hospedaje_Ciudad=ciud_nombre
-left join [BASADOS_DE_DATOS].Pais on Hospedaje_Pais=pais_nombre
+left join [BASADOS_DE_DATOS].Pais on Hospedaje_Pais COLLATE Latin1_General_CI_AI = pais_nombre COLLATE Latin1_General_CI_AI
 left join [BASADOS_DE_DATOS].Hospedaje 
 on Hospedaje_Nombre = hosp_nombre and Hospedaje_Direccion = hosp_direccion
 and Hospedaje_Check_In = hosp_hora_check_in and Hospedaje_Check_Out = hosp_hora_check_out
@@ -632,7 +632,7 @@ and Vuelo_Precio = vuel_precio and Vuelo_Fecha_Salida = vuel_fecha_salida and Vu
 and Vuelo_Horario_Salida=vuel_horario_salida
 and Vuelo_Horario_Llegada =  vuel_horario_llegada
 and Vuelo_Incluye_Carry=vuel_incluye_carry and Vuelo_Incluye_Valija=vuel_incluye_valija
-and Venta_Nro_Venta is not null and vuel_codigo is not null
+WHERE Venta_Nro_Venta is not null and vuel_codigo is not null
 
 insert into [BASADOS_DE_DATOS].ItemVentaHospedaje(
     item_venta,
@@ -652,7 +652,7 @@ Detalle_Venta_Hospedaje_Cod_Reserva
 from gd_esquema.Maestra
 left join [BASADOS_DE_DATOS].Hospedaje on Hospedaje_Direccion=hosp_direccion
 left join [BASADOS_DE_DATOS].Ciudad on Hospedaje_Ciudad=ciud_nombre
-left join [BASADOS_DE_DATOS].Pais on Hospedaje_Pais=pais_nombre and pais_codigo=ciud_pais
+left join [BASADOS_DE_DATOS].Pais on Hospedaje_Pais COLLATE Latin1_General_CI_AI = pais_nombre COLLATE Latin1_General_CI_AI and pais_codigo=ciud_pais
 left join [BASADOS_DE_DATOS].HabitacionHospedaje on hosp_codigo = habi_hospedaje and Habitacion_Nombre = habi_nombre 
 and Habitacion_Descripcion = habi_descripcion and Habitacion_Precio_Noche = habi_precio_noche
 where ciud_codigo = hosp_ciudad and Venta_Nro_Venta is not null and hosp_codigo is not null
@@ -705,7 +705,7 @@ Detalle_Propuesta_Hospedaje_Subtotal
 from gd_esquema.Maestra
 left join [BASADOS_DE_DATOS].Hospedaje on Hospedaje_Direccion=hosp_direccion
 left join [BASADOS_DE_DATOS].Ciudad on Hospedaje_Ciudad=ciud_nombre
-left join [BASADOS_DE_DATOS].Pais on Hospedaje_Pais=pais_nombre and pais_codigo=ciud_pais
+left join [BASADOS_DE_DATOS].Pais on Hospedaje_Pais COLLATE Latin1_General_CI_AI = pais_nombre COLLATE Latin1_General_CI_AI and pais_codigo=ciud_pais
 left join [BASADOS_DE_DATOS].HabitacionHospedaje on hosp_codigo = habi_hospedaje and Habitacion_Nombre = habi_nombre
 and Habitacion_Descripcion = habi_descripcion and Habitacion_Precio_Noche = habi_precio_noche
 where ciud_codigo = hosp_ciudad and Propuesta_Nro_Propuesta is not null and hosp_codigo is not null 
