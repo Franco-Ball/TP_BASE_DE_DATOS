@@ -1,0 +1,97 @@
+---
+config:
+  theme: dark
+---
+erDiagram
+    
+    BI_dimension_tiempo{
+        bigint id_tiempo
+        int anyo
+        int cuatrimestre
+        int mes
+    }
+    BI_dimension_rango_etario_cliente{
+        bigint id_rango_etario_cliente
+        nvarchar(30) rango
+    }
+    BI_dimension_rango_etario_agente{
+        bigint id_rango_etario_agente
+        nvarchar(30) rango
+    }
+    BI_dimension_temporada{
+        bigint id_temporada
+        nvarchar(30) temporada
+    }
+    BI_dimension_tipo_servicio{
+        bigint id_tipo_servicio
+        nvarchar(30) tipo
+    }
+    BI_dimension_canal_de_venta{
+        bigint id_canal_de_venta
+        nvarchar(255) canal
+    }
+    BI_dimension_estado_propuesta{
+        bigint id_estado_propuesta
+        nvarchar(255) estado
+    }
+    BI_dimension_detalle_aspecto{
+        bigint id_detalle_aspecto
+        nvarchar(255) detalle
+    }
+    BI_hecho_venta{
+        bigint rango_etario_cliente fk
+        bigint canal_de_venta fk
+        bigint tiempo fk
+        bigint tipo_servicio fk
+        decimal importe_total
+    }
+    BI_dimension_canal_de_venta ||--o{ BI_hecho_venta : ""
+    BI_dimension_rango_etario_cliente ||--o{ BI_hecho_venta : ""
+    BI_dimension_tiempo ||--o{ BI_hecho_venta : ""
+    BI_dimension_tipo_servicio ||--o{ BI_hecho_venta : ""
+
+    BI_hecho_solicitud{
+        bigint tiempo fk
+        bigint temporada fk
+        bigint rango_etario_cliente fk
+        int dias_anticipacion
+    }
+
+    BI_dimension_tiempo ||--o{ BI_hecho_solicitud : ""
+    BI_dimension_temporada ||--o{ BI_hecho_solicitud : ""
+    BI_dimension_rango_etario_cliente ||--o{ BI_hecho_solicitud : ""
+
+    BI_hecho_propuesta{
+        bigint estado_propuesta fk
+        bigint temporada_inicio_viaje fk
+        bigint tiempo_emision_propuesta fk
+        bigint tiempo_inicio_viaje fk
+        bigint tiempo_fecha_solicitud fk
+        bigint rango_etario_agente fk
+        int dias_entre_solicitud_y_propuesta
+        decimal importe_total
+        decimal desvio_presupuesto_importe
+    }
+
+    BI_dimension_estado_propuesta ||--o{ BI_hecho_propuesta : ""
+    BI_dimension_temporada ||--o{ BI_hecho_propuesta : ""
+    BI_dimension_tiempo ||--o{ BI_hecho_propuesta : "emision propuesta"
+    BI_dimension_tiempo ||--o{ BI_hecho_propuesta : "inicio viaje"
+    BI_dimension_tiempo ||--o{ BI_hecho_propuesta : "fecha solicitud"
+    BI_dimension_rango_etario_agente ||--o{ BI_hecho_propuesta : ""
+
+    BI_hecho_aspecto{
+        bigint tiempo fk
+        bigint detalle_aspecto fk
+        int puntaje
+    }
+    BI_dimension_tiempo ||--o{ BI_hecho_aspecto : ""
+    BI_dimension_detalle_aspecto ||--o{ BI_hecho_aspecto : ""
+
+    BI_hecho_encuesta{
+        bigint rango_etario_agente fk
+        bigint tiempo fk
+        int puntaje
+    }
+    BI_dimension_rango_etario_agente ||--o{ BI_hecho_encuesta : ""
+    BI_dimension_tiempo ||--o{ BI_hecho_encuesta : ""
