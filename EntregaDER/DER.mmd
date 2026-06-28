@@ -8,7 +8,6 @@ erDiagram
     Provincia {
         bigint prov_codigo pk
         nvarchar(255) prov_nombre
-        bigint prov_pais fk
     }
     Localidad {
         bigint loca_codigo pk
@@ -36,9 +35,10 @@ erDiagram
     }
 
     Cliente{
+        bigint clie_codigo pk
         nvarchar(255) clie_nombre
         nvarchar(255) clie_apellido
-        nvarchar(255) clie_dni pk
+        nvarchar(255) clie_dni 
         nvarchar(255) clie_telefono
         nvarchar(255) clie_mail
         nvarchar(255) clie_direccion
@@ -54,9 +54,9 @@ erDiagram
         nvarchar(255) medi_nombre
     }
 	Venta {
-		bigint vent_codigo PK ""  
-		nvarchar(255) vent_cliente FK ""  
-		bigint vent_agente FK ""  
+		bigint vent_codigo PK ""
+		bigint vent_cliente FK ""
+		bigint vent_agente FK ""
 		date vent_fecha  ""  
 		bigint vent_canal_venta fk 
 		decimal vent_subtotal  ""  
@@ -65,30 +65,32 @@ erDiagram
 		bigint vent_medio_pago fk 
 	}
     Venta_Propuesta {
+        bigint vpro_codigo pk
         bigint vpro_venta fk
         bigint vpro_propuesta fk
     }
 
 	ItemVentaVuelo {
-		bigint item_venta FK ""  
-		bigint item_vuelo FK ""  
-		decimal item_precio_unitario  "" 
-        int vuel_cant_pasajes  ""  
-		nvarchar(255) item_cod_reserva  "" 
-        decimal item_subtotal 
+		bigint item_codigo PK ""
+		bigint item_venta FK ""
+		bigint item_vuelo FK ""
+		decimal item_precio_unitario  ""
+        int vuel_cant_pasajes  ""
+		nvarchar(255) item_cod_reserva  ""
+        decimal item_subtotal
 	}
 
 	Vuelo {
 		bigint vuel_codigo PK ""  
-		char(50) vuel_detalle  "" 
 		decimal vuel_precio  ""  
 		nvarchar(10) vuel_aeropuerto_salida  ""  
         nvarchar(10) vuel_aeropuerto_llegada  "" 
 		date vuel_fecha_salida  ""  
 		nvarchar(50) vuel_horario_salida  ""  
 		date vuel_fecha_llegada  ""  
-		nvarchar(50) vuel_horario_llegada  ""  
-		nvarchar(255) aerolinea FK "" 
+		nvarchar(50) vuel_horario_llegada  ""
+        int vuel_duracion  ""
+		nvarchar(255) aerolinea FK ""
         bit vuel_incluye_carry
         bit vuel_incluye_valija
 	}
@@ -107,21 +109,22 @@ erDiagram
     }
     Aerolinea{
         nvarchar(255) aero_nombre
-        nvarchar(255) aero_codigo
+        nvarchar(255) aero_codigo pk
         bigint aero_pais fk
         bigint aero_alianza fk
     }
     Aeropuerto{
-        nvarchar(10) aero_codigo
+        nvarchar(10) aero_codigo pk
         nvarchar(200) aero_descripcion
         bigint aero_ciudad fk
     }
 
 	ItemVentaHospedaje {
-		bigint item_venta FK ""  
-		bigint item_hospedaje FK ""  
-		bigint item_habitacion FK ""  
-		date item_desde  ""  
+		bigint item_codigo PK ""
+		bigint item_venta FK ""
+		bigint item_hospedaje FK ""
+		bigint item_habitacion FK ""
+		date item_desde  ""
 		date item_hasta ""  
 		int item_hospedaje_cantidad  ""
 		decimal item_precio_unitario  ""
@@ -149,12 +152,14 @@ erDiagram
 	}
 
 	ItemVentaExcursion {
-		bigint item_venta FK ""  
-		bigint item_excursion FK ""  
-		smalldatetime item_fecha  ""  
-		int item_cant  ""  
-		decimal item_precio  ""  
-		varchar(255) item_cod_reserva  ""  
+		bigint item_codigo PK ""
+		bigint item_venta FK ""
+		bigint item_excursion FK ""
+		date item_fecha  ""
+		int item_cant  ""
+		decimal item_precio_unitario  ""
+		decimal item_subtotal  ""
+		nvarchar(255) item_cod_reserva  ""
 	}
 
 	Excursion {
@@ -173,8 +178,8 @@ erDiagram
         nvarchar(255) prov_telefono
     }
 	Solicitud {
-		bigint soli_numero pk ""  
-		nvarchar(255) soli_cliente fk ""  
+		bigint soli_numero pk ""
+		bigint soli_cliente fk ""
 		date soli_fecha  ""  
 		date soli_inicio_tentativa  ""  
 		date soli_fin_tentativa  ""  
@@ -185,8 +190,9 @@ erDiagram
 	}
 
 	CiudadSolicitud {
-		bigint ciud_numero fk ""  
-		nvarchar(255) ciud_detalle  ""  
+		bigint ciud_codigo pk ""
+		bigint ciud_numero fk ""
+		nvarchar(255) ciud_detalle  ""
 		int ciud_cant_dias  ""  
 		nvarchar(max) ciud_observaciones  ""  
 	}
@@ -210,6 +216,7 @@ erDiagram
     }
 
     ItemPropuestaVuelo{
+        bigint item_codigo pk
         bigint item_propuesta fk
         bigint item_vuelo fk
         int item_cant_pasajes
@@ -218,10 +225,11 @@ erDiagram
     }
 
     ItemPropuestaHospedaje{
+        bigint item_codigo pk
         bigint item_propuesta fk
         bigint item_hospedaje fk
         bigint item_habitacion fk
-        date item_ingreso  ""  
+        date item_ingreso  ""
 		date item_egreso  ""  
 		int item_cant_habitaciones  ""  
 		decimal subtotal  ""  
@@ -235,7 +243,8 @@ erDiagram
         nvarchar(max) encu_comentario
     }
     Aspecto{
-        bigint aspe_encuesta
+        bigint aspe_codigo pk
+        bigint aspe_encuesta fk
         nvarchar(255) aspe_detalle
         int aspe_puntaje
     }
@@ -257,7 +266,7 @@ erDiagram
     ItemPropuestaVuelo }o--|| Vuelo:""
     Propuesta ||--o{ ItemPropuestaHospedaje:""
     ItemPropuestaHospedaje }o--|| Hospedaje:""
-    Solicitud ||--|{ Propuesta: ""
+    Solicitud ||--o{ Propuesta: ""
     Solicitud ||--|{ CiudadSolicitud:""
 	Hospedaje||--|{HabitacionHospedaje:"  "
 	Venta||--o{ItemVentaVuelo:"  "
@@ -266,7 +275,6 @@ erDiagram
 	Vuelo||--o{ItemVentaVuelo:"  "
 	Hospedaje||--o{ItemVentaHospedaje:"  "
 	Excursion||--o{ItemVentaExcursion:"  "
-    Pais ||--|{ Provincia : ""
     Provincia ||--|{ Localidad : ""
     Localidad ||--o{ Agencia : ""
     Localidad ||--o{ Agente : ""
