@@ -1,31 +1,3 @@
-/* ============================================================================
-   SCRIPT DE CREACION Y MIGRACION DEL MODELO RELACIONAL
-   Grupo / Esquema: BASADOS_DE_DATOS        Base de datos: GD1C2026
-   ----------------------------------------------------------------------------
-   Este unico script realiza, en orden y de una sola ejecucion:
-     1) Creacion del esquema [BASADOS_DE_DATOS].
-     2) Creacion de todas las tablas (PK, FK, tipos respetando la maestra).
-     3) Creacion de indices (claves naturales de migracion y FKs).
-     4) Creacion de los Stored Procedures de migracion (uno por tabla),
-        tal como exige el enunciado ("...deberan utilizarse Stored Procedures").
-     5) Ejecucion de los SP en orden de dependencias para poblar el modelo
-        desde gd_esquema.Maestra.
-
-   Decisiones de migracion (ver Estrategia.pdf):
-     - Paises con/sin tilde se tratan como DISTINTOS: cada variante literal
-       ("Peru" y "Peru" con tilde) es un pais propio. No se usa COLLATE
-       insensible a acentos; las comparaciones de nombre usan la collation por
-       defecto (sensible a acentos), para no alterar ni inferir sobre el dato.
-     - Claves naturales "sucias" (Aerolinea, Aeropuerto, Agencia, Agente) se
-       consolidan con GROUP BY sobre la clave + MAX() del resto, para evitar
-       violaciones de PK y de FK (esas claves se insertan crudas en tablas hijas).
-     - Cliente usa clave subrogada (clie_codigo) y se deduplica por
-       (dni, nombre, apellido, direccion) para que la resolucion de FK desde
-       Venta/Solicitud/Encuesta sea 1:1 y no se dupliquen transacciones.
-     - Las tablas de detalle/cruce llevan PK subrogada IDENTITY (item_codigo,
-       vpro_codigo, aspe_codigo, ciud_codigo).
-   ============================================================================ */
-
 USE GD1C2026
 GO
 
