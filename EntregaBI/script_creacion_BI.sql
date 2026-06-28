@@ -1,636 +1,532 @@
-/* ============================================================================
-   SCRIPT DE CREACION Y CARGA DEL MODELO DE BI  (esquema estrella)
-   ----------------------------------------------------------------------------
-   Basado en:
-     - EntregaDER/"DER Segunda Entrega Completo.mmd"
-     - Enunciado.md (Especificacion del Modelo de BI, indicadores 1 a 10)
-
-   IMPORTANTE: este script se ejecuta DESPUES de script_creacion_inicial.sql.
-   La carga del modelo dimensional se realiza leyendo del MODELO TRANSACCIONAL
-   ya migrado en el esquema [BASADOS_DE_DATOS] (no de gd_esquema.Maestra),
-   tal como lo exige el enunciado.
-
-   Incluye al final (seccion 5) las 10 vistas de indicadores de negocio que
-   pide el enunciado, una por indicador.
-
-   Decisiones tomadas (documentar tambien en Estrategia.pdf):
-     - Tiempo: anyo / cuatrimestre / mes. cuatrimestre = ((mes-1)/4)+1
-       (1: meses 1-4, 2: 5-8, 3: 9-12).
-     - Rango etario CLIENTE (enunciado): cortes con limite superior inclusive
-         <= 25            -> 'Menores de 25'
-         26-35 (35 incl)  -> 'Entre 25 y 35'
-         36-50 (50 incl)  -> 'Entre 35 y 50'
-         > 50             -> 'Mayores de 50'
-     - Rango etario AGENTE (enunciado): define EXACTAMENTE 3 rangos que arrancan
-       en 25 (no existe 'Menores de 25' como en cliente), porque se asume que no
-       hay agentes menores de 25 anios. Las etiquetas se respetan tal cual:
-         25-35  -> 'Entre 25 y 35'
-         36-50  -> 'Entre 35 y 50'
-         > 50   -> 'Mayores de 50'
-     - Edad: anios cumplidos calculados contra la fecha actual (GETDATE()).
-     - Temporada (enunciado, trimestres calendario):
-         Verano (Ene-Mar) / Otono (Abr-Jun) / Invierno (Jul-Sep) / Primavera (Oct-Dic)
-     - Tipo de servicio (enunciado): 'Venta Directa' / 'Propuesta a Medida'.
-       Una venta es 'Propuesta a Medida' si esta asociada a una propuesta
-       (tabla Venta_Propuesta); en caso contrario es 'Venta Directa'.
-     - BI_hecho_venta tiene grano = venta; la medida es vent_importe_total.
-     - BI_hecho_encuesta.puntaje = promedio (redondeado) de los puntajes de
-       los aspectos de la encuesta.
-   ============================================================================ */
-
 USE GD1C2026
 GO
 
-/* ===========================================================================
-   0) LIMPIEZA - DROP de vistas y tablas de BI previas (para re-ejecutar).
-      Primero las vistas, luego los hechos, luego las dimensiones (por las FKs).
-   =========================================================================== */
-
--- Vistas de indicadores.
-DROP VIEW IF EXISTS [BASADOS_DE_DATOS].BI_vista_ticket_promedio;
-DROP VIEW IF EXISTS [BASADOS_DE_DATOS].BI_vista_distribucion_facturacion;
-DROP VIEW IF EXISTS [BASADOS_DE_DATOS].BI_vista_ranking_solicitudes_temporada;
-DROP VIEW IF EXISTS [BASADOS_DE_DATOS].BI_vista_anticipacion_promedio;
-DROP VIEW IF EXISTS [BASADOS_DE_DATOS].BI_vista_tasa_aceptacion_propuestas;
-DROP VIEW IF EXISTS [BASADOS_DE_DATOS].BI_vista_cotizacion_promedio_temporada;
-DROP VIEW IF EXISTS [BASADOS_DE_DATOS].BI_vista_tiempo_promedio_respuesta;
-DROP VIEW IF EXISTS [BASADOS_DE_DATOS].BI_vista_desvio_presupuesto;
-DROP VIEW IF EXISTS [BASADOS_DE_DATOS].BI_vista_ranking_aspectos;
-DROP VIEW IF EXISTS [BASADOS_DE_DATOS].BI_vista_satisfaccion_promedio_agente;
-
--- Tablas de hechos.
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_hecho_encuesta;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_hecho_aspecto;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_hecho_propuesta;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_hecho_solicitud;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_hecho_venta;
-
--- Tablas de dimensiones.
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_dimension_estado_propuesta;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_dimension_canal_de_venta;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_dimension_tipo_servicio;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_dimension_temporada;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente;
-DROP TABLE IF EXISTS [BASADOS_DE_DATOS].BI_dimension_tiempo;
+-- ========================================================================================
+-- 1. DROP DE VISTAS
+-- ========================================================================================
+-- Las siguientes sentencias eliminan las vistas de indicadores si ya existen en la base, 
+-- para permitir que el script se pueda ejecutar múltiples veces sin arrojar errores de duplicidad.
+IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Ticket_Promedio', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Ticket_Promedio;
+IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Distribucion_Facturacion', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Distribucion_Facturacion;
+IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Ranking_Solicitudes_Temporada', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Ranking_Solicitudes_Temporada;
+IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Anticipacion_Solicitudes', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Anticipacion_Solicitudes;
+IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Tasa_Aceptacion_Propuestas', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Tasa_Aceptacion_Propuestas;
+IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Cotizacion_Promedio_Temporada', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Cotizacion_Promedio_Temporada;
+IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Tiempo_Respuesta', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Tiempo_Respuesta;
+IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Desvio_Presupuesto', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Desvio_Presupuesto;
+IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Ranking_Aspectos', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Ranking_Aspectos;
+IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Satisfaccion_Promedio_Agente', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Satisfaccion_Promedio_Agente;
 GO
 
-/* ===========================================================================
-   1) DDL - DIMENSIONES
-   =========================================================================== */
+-- ========================================================================================
+-- 2. DROP DE TABLAS DE HECHOS
+-- ========================================================================================
+-- Se eliminan las tablas de hechos en caso de existir, respetando el orden de dependencias 
+-- (primero las tablas que contienen Foreign Keys antes que las dimensiones).
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_hecho_venta', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_hecho_venta;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_hecho_solicitud', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_hecho_solicitud;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_hecho_propuesta', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_hecho_propuesta;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_hecho_aspecto', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_hecho_aspecto;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_hecho_encuesta', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_hecho_encuesta;
+GO
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_tiempo (
-    id_tiempo       bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    anyo            int,
-    cuatrimestre    int,
-    mes             int
+-- ========================================================================================
+-- 3. DROP DE DIMENSIONES
+-- ========================================================================================
+-- Se eliminan las tablas de dimensiones luego de haber eliminado las tablas de hechos que las referencian.
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_tiempo', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_tiempo;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_rango_etario_agente', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_temporada', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_temporada;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_tipo_servicio', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_tipo_servicio;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_canal_de_venta', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_canal_de_venta;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_estado_propuesta', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_estado_propuesta;
+IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_detalle_aspecto', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto;
+GO
+
+-- ========================================================================================
+-- 4. DROP DE PROCEDURES Y FUNCIONES
+-- ========================================================================================
+-- Se eliminan los stored procedures y funciones auxiliares generados para la carga de datos.
+IF OBJECT_ID('[BASADOS_DE_DATOS].sp_migrar_dimensiones_bi', 'P') IS NOT NULL DROP PROCEDURE [BASADOS_DE_DATOS].sp_migrar_dimensiones_bi;
+IF OBJECT_ID('[BASADOS_DE_DATOS].sp_migrar_hechos_bi', 'P') IS NOT NULL DROP PROCEDURE [BASADOS_DE_DATOS].sp_migrar_hechos_bi;
+IF OBJECT_ID('[BASADOS_DE_DATOS].fn_calcular_edad', 'FN') IS NOT NULL DROP FUNCTION [BASADOS_DE_DATOS].fn_calcular_edad;
+IF OBJECT_ID('[BASADOS_DE_DATOS].fn_rango_etario', 'FN') IS NOT NULL DROP FUNCTION [BASADOS_DE_DATOS].fn_rango_etario;
+IF OBJECT_ID('[BASADOS_DE_DATOS].fn_temporada', 'FN') IS NOT NULL DROP FUNCTION [BASADOS_DE_DATOS].fn_temporada;
+GO
+
+-- ========================================================================================
+-- 5. FUNCIONES AUXILIARES
+-- ========================================================================================
+
+-- Función para calcular la edad exacta de una persona en base a su fecha de nacimiento y la fecha del evento.
+CREATE FUNCTION [BASADOS_DE_DATOS].fn_calcular_edad(@fecha_nac DATE, @fecha_evento DATE)
+RETURNS INT AS
+BEGIN
+    RETURN DATEDIFF(YEAR, @fecha_nac, @fecha_evento) - CASE WHEN (MONTH(@fecha_nac) > MONTH(@fecha_evento)) OR (MONTH(@fecha_nac) = MONTH(@fecha_evento) AND DAY(@fecha_nac) > DAY(@fecha_evento)) THEN 1 ELSE 0 END
+END
+GO
+
+-- Función para categorizar la edad numérica en los rangos etarios solicitados por el negocio.
+CREATE FUNCTION [BASADOS_DE_DATOS].fn_rango_etario(@edad INT)
+RETURNS NVARCHAR(50) AS
+BEGIN
+    RETURN CASE
+        WHEN @edad <= 25 THEN 'Menores de 25 años inclusive'
+        WHEN @edad > 25 AND @edad <= 35 THEN 'Entre 25 y 35 años inclusive'
+        WHEN @edad > 35 AND @edad <= 50 THEN 'Entre 35 y 50 años inclusive'
+        ELSE 'Mayores de 50 años'
+    END
+END
+GO
+
+-- Función para determinar la temporada (Verano, Otoño, Invierno, Primavera) en base a un mes.
+CREATE FUNCTION [BASADOS_DE_DATOS].fn_temporada(@fecha DATE)
+RETURNS NVARCHAR(50) AS
+BEGIN
+    RETURN CASE
+        WHEN MONTH(@fecha) IN (1, 2, 3) THEN 'Verano (Enero - Marzo)'
+        WHEN MONTH(@fecha) IN (4, 5, 6) THEN 'Otoño (Abril - Junio)'
+        WHEN MONTH(@fecha) IN (7, 8, 9) THEN 'Invierno (Julio - Septiembre)'
+        WHEN MONTH(@fecha) IN (10, 11, 12) THEN 'Primavera (Octubre - Diciembre)'
+    END
+END
+GO
+
+-- ========================================================================================
+-- 6. CREACIÓN DE DIMENSIONES
+-- ========================================================================================
+
+-- Dimensión Tiempo: Agrupa y clasifica las fechas en años, cuatrimestres y meses.
+CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_tiempo(
+    id_tiempo bigint IDENTITY(1,1) PRIMARY KEY,
+    anyo int,
+    cuatrimestre int,
+    mes int
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente (
-    id_rango_etario_cliente bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    rango                   nvarchar(30)
+-- Dimensión Rango Etario Cliente: Define los buckets de edad de los clientes.
+CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente(
+    id_rango_etario_cliente bigint IDENTITY(1,1) PRIMARY KEY,
+    rango nvarchar(50)
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente (
-    id_rango_etario_agente  bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    rango                   nvarchar(30)
+-- Dimensión Rango Etario Agente: Define los buckets de edad de los agentes.
+CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente(
+    id_rango_etario_agente bigint IDENTITY(1,1) PRIMARY KEY,
+    rango nvarchar(50)
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_temporada (
-    id_temporada    bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    temporada       nvarchar(30)
+-- Dimensión Temporada: Almacena las 4 estaciones o temporadas del año.
+CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_temporada(
+    id_temporada bigint IDENTITY(1,1) PRIMARY KEY,
+    temporada nvarchar(50)
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_tipo_servicio (
-    id_tipo_servicio    bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    tipo                nvarchar(30)
+-- Dimensión Tipo Servicio: Identifica si un servicio proviene de venta directa o de propuesta a medida.
+CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_tipo_servicio(
+    id_tipo_servicio bigint IDENTITY(1,1) PRIMARY KEY,
+    tipo nvarchar(50)
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_canal_de_venta (
-    id_canal_de_venta   bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    canal               nvarchar(255)
+-- Dimensión Canal de Venta: Registra los distintos canales por donde ingresa la venta.
+CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_canal_de_venta(
+    id_canal_de_venta bigint IDENTITY(1,1) PRIMARY KEY,
+    canal nvarchar(255)
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_estado_propuesta (
-    id_estado_propuesta bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    estado              nvarchar(255)
+-- Dimensión Estado Propuesta: Muestra los estados finales de una propuesta (ej. Aceptada, Rechazada).
+CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_estado_propuesta(
+    id_estado_propuesta bigint IDENTITY(1,1) PRIMARY KEY,
+    estado nvarchar(255)
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto (
-    id_detalle_aspecto  bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    detalle             nvarchar(255)
+-- Dimensión Detalle Aspecto: Contiene los nombres de los atributos valorados en las encuestas.
+CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto(
+    id_detalle_aspecto bigint IDENTITY(1,1) PRIMARY KEY,
+    detalle nvarchar(255)
 );
+GO
 
-/* ===========================================================================
-   2) DDL - HECHOS
-   (id surrogado por hecho; las FK pueden quedar NULL si el atributo de origen
-    no esta presente)
-   =========================================================================== */
+-- ========================================================================================
+-- 7. CREACIÓN DE TABLAS DE HECHOS
+-- ========================================================================================
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_venta (
-    id_hecho_venta          bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    rango_etario_cliente    bigint,
-    canal_de_venta          bigint,
-    tiempo                  bigint,
-    tipo_servicio           bigint,
-    importe_total           decimal(18,2),
+-- Hecho Venta: Registra los importes totales de las ventas asociándolas al tiempo, cliente, canal y servicio.
+CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_venta(
+    rango_etario_cliente bigint,
+    canal_de_venta bigint,
+    tiempo bigint,
+    tipo_servicio bigint,
+    importe_total decimal(18,2),
     FOREIGN KEY (rango_etario_cliente) REFERENCES [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente(id_rango_etario_cliente),
-    FOREIGN KEY (canal_de_venta)       REFERENCES [BASADOS_DE_DATOS].BI_dimension_canal_de_venta(id_canal_de_venta),
-    FOREIGN KEY (tiempo)               REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (tipo_servicio)        REFERENCES [BASADOS_DE_DATOS].BI_dimension_tipo_servicio(id_tipo_servicio)
+    FOREIGN KEY (canal_de_venta) REFERENCES [BASADOS_DE_DATOS].BI_dimension_canal_de_venta(id_canal_de_venta),
+    FOREIGN KEY (tiempo) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
+    FOREIGN KEY (tipo_servicio) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tipo_servicio(id_tipo_servicio)
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_solicitud (
-    id_hecho_solicitud      bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    tiempo                  bigint,
-    temporada               bigint,
-    rango_etario_cliente    bigint,
-    dias_anticipacion       int,
-    FOREIGN KEY (tiempo)               REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (temporada)            REFERENCES [BASADOS_DE_DATOS].BI_dimension_temporada(id_temporada),
+-- Hecho Solicitud: Contabiliza los días de anticipación de una solicitud según la temporada y la edad del cliente.
+CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_solicitud(
+    tiempo bigint,
+    temporada bigint,
+    rango_etario_cliente bigint,
+    dias_anticipacion int,
+    FOREIGN KEY (tiempo) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
+    FOREIGN KEY (temporada) REFERENCES [BASADOS_DE_DATOS].BI_dimension_temporada(id_temporada),
     FOREIGN KEY (rango_etario_cliente) REFERENCES [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente(id_rango_etario_cliente)
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_propuesta (
-    id_hecho_propuesta                  bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    estado_propuesta                    bigint,
-    temporada_inicio_viaje              bigint,
-    tiempo_emision_propuesta            bigint,
-    tiempo_inicio_viaje                 bigint,
-    tiempo_fecha_solicitud              bigint,
-    rango_etario_agente                 bigint,
-    dias_entre_solicitud_y_propuesta    int,
-    importe_total                       decimal(18,2),
-    desvio_presupuesto_importe          decimal(18,2),
-    FOREIGN KEY (estado_propuesta)         REFERENCES [BASADOS_DE_DATOS].BI_dimension_estado_propuesta(id_estado_propuesta),
-    FOREIGN KEY (temporada_inicio_viaje)   REFERENCES [BASADOS_DE_DATOS].BI_dimension_temporada(id_temporada),
+-- Hecho Propuesta: Permite analizar la eficacia (tiempos de respuesta, desvíos monetarios) del trabajo de los agentes y los importes de propuestas.
+CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_propuesta(
+    estado_propuesta bigint,
+    temporada_inicio_viaje bigint,
+    tiempo_emision_propuesta bigint,
+    tiempo_inicio_viaje bigint,
+    tiempo_fecha_solicitud bigint,
+    rango_etario_agente bigint,
+    dias_entre_solicitud_y_propuesta int,
+    importe_total decimal(18,2),
+    desvio_presupuesto_importe decimal(18,2),
+    FOREIGN KEY (estado_propuesta) REFERENCES [BASADOS_DE_DATOS].BI_dimension_estado_propuesta(id_estado_propuesta),
+    FOREIGN KEY (temporada_inicio_viaje) REFERENCES [BASADOS_DE_DATOS].BI_dimension_temporada(id_temporada),
     FOREIGN KEY (tiempo_emision_propuesta) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (tiempo_inicio_viaje)      REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (tiempo_fecha_solicitud)   REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (rango_etario_agente)      REFERENCES [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente(id_rango_etario_agente)
+    FOREIGN KEY (tiempo_inicio_viaje) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
+    FOREIGN KEY (tiempo_fecha_solicitud) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
+    FOREIGN KEY (rango_etario_agente) REFERENCES [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente(id_rango_etario_agente)
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_aspecto (
-    id_hecho_aspecto    bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    tiempo              bigint,
-    detalle_aspecto     bigint,
-    puntaje             int,
-    FOREIGN KEY (tiempo)          REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
+-- Hecho Aspecto: Almacena el puntaje directo de cada pregunta individual dentro de una encuesta.
+CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_aspecto(
+    tiempo bigint,
+    detalle_aspecto bigint,
+    puntaje int,
+    FOREIGN KEY (tiempo) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
     FOREIGN KEY (detalle_aspecto) REFERENCES [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto(id_detalle_aspecto)
 );
 
-CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_encuesta (
-    id_hecho_encuesta       bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    rango_etario_agente     bigint,
-    tiempo                  bigint,
-    puntaje                 int,
+-- Hecho Encuesta: Mide la satisfacción general (promediada) de cada atención brindada por un agente en un momento del tiempo.
+CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_encuesta(
+    rango_etario_agente bigint,
+    tiempo bigint,
+    puntaje decimal(18,2), 
     FOREIGN KEY (rango_etario_agente) REFERENCES [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente(id_rango_etario_agente),
-    FOREIGN KEY (tiempo)              REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo)
+    FOREIGN KEY (tiempo) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo)
 );
-
 GO
 
-/* ===========================================================================
-   3) DML - CARGA DE DIMENSIONES (desde el modelo transaccional)
-   =========================================================================== */
+-- ========================================================================================
+-- 8. PROCEDIMIENTOS DE MIGRACIÓN
+-- ========================================================================================
 
--- TIEMPO: todas las combinaciones (anyo, mes) presentes en las fechas del modelo.
--- Reunimos todas las fechas en una tabla temporal para no usar una subconsulta en el FROM.
-SELECT CAST(vent_fecha AS date) AS fecha
-INTO #fechas_tiempo
-FROM [BASADOS_DE_DATOS].Venta
-WHERE vent_fecha IS NOT NULL;
+-- Stored Procedure principal que poblará las tablas maestras de dimensiones estáticas e inferidas (catálogos)
+CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_dimensiones_bi
+AS
+BEGIN
+    -- Carga de la dimensión Tiempo: Extraemos fechas directamente con múltiples SELECTs usando UNION
+    INSERT INTO [BASADOS_DE_DATOS].BI_dimension_tiempo (anyo, cuatrimestre, mes)
+    SELECT YEAR(vent_fecha), 
+           CASE WHEN MONTH(vent_fecha) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(vent_fecha) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(vent_fecha)
+    FROM [BASADOS_DE_DATOS].Venta WHERE vent_fecha IS NOT NULL
+    UNION
+    SELECT YEAR(soli_fecha), 
+           CASE WHEN MONTH(soli_fecha) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(soli_fecha) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(soli_fecha)
+    FROM [BASADOS_DE_DATOS].Solicitud WHERE soli_fecha IS NOT NULL
+    UNION
+    SELECT YEAR(soli_inicio_tentativa), 
+           CASE WHEN MONTH(soli_inicio_tentativa) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(soli_inicio_tentativa) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(soli_inicio_tentativa)
+    FROM [BASADOS_DE_DATOS].Solicitud WHERE soli_inicio_tentativa IS NOT NULL
+    UNION
+    SELECT YEAR(prop_fecha_emision), 
+           CASE WHEN MONTH(prop_fecha_emision) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(prop_fecha_emision) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(prop_fecha_emision)
+    FROM [BASADOS_DE_DATOS].Propuesta WHERE prop_fecha_emision IS NOT NULL
+    UNION
+    SELECT YEAR(prop_fecha_desde), 
+           CASE WHEN MONTH(prop_fecha_desde) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(prop_fecha_desde) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(prop_fecha_desde)
+    FROM [BASADOS_DE_DATOS].Propuesta WHERE prop_fecha_desde IS NOT NULL
+    UNION
+    SELECT YEAR(encu_fecha), 
+           CASE WHEN MONTH(encu_fecha) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(encu_fecha) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(encu_fecha)
+    FROM [BASADOS_DE_DATOS].Encuesta WHERE encu_fecha IS NOT NULL;
 
-INSERT INTO #fechas_tiempo (fecha) SELECT soli_fecha            FROM [BASADOS_DE_DATOS].Solicitud WHERE soli_fecha IS NOT NULL;
-INSERT INTO #fechas_tiempo (fecha) SELECT soli_inicio_tentativa FROM [BASADOS_DE_DATOS].Solicitud WHERE soli_inicio_tentativa IS NOT NULL;
-INSERT INTO #fechas_tiempo (fecha) SELECT prop_fecha_emision    FROM [BASADOS_DE_DATOS].Propuesta WHERE prop_fecha_emision IS NOT NULL;
-INSERT INTO #fechas_tiempo (fecha) SELECT prop_fecha_desde      FROM [BASADOS_DE_DATOS].Propuesta WHERE prop_fecha_desde IS NOT NULL;
-INSERT INTO #fechas_tiempo (fecha) SELECT encu_fecha            FROM [BASADOS_DE_DATOS].Encuesta  WHERE encu_fecha IS NOT NULL;
+    -- Inserción explícita de los 4 rangos etarios solicitados para clientes
+    INSERT INTO [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente (rango)
+    VALUES ('Menores de 25 años inclusive'), ('Entre 25 y 35 años inclusive'), ('Entre 35 y 50 años inclusive'), ('Mayores de 50 años');
 
-INSERT INTO [BASADOS_DE_DATOS].BI_dimension_tiempo (anyo, cuatrimestre, mes)
-SELECT DISTINCT
-    YEAR(fecha)                  AS anyo,
-    ((MONTH(fecha) - 1) / 4) + 1 AS cuatrimestre,
-    MONTH(fecha)                 AS mes
-FROM #fechas_tiempo;
+    -- Inserción explícita de los 4 rangos etarios solicitados para agentes
+    INSERT INTO [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente (rango)
+    VALUES ('Menores de 25 años inclusive'), ('Entre 25 y 35 años inclusive'), ('Entre 35 y 50 años inclusive'), ('Mayores de 50 años');
 
-DROP TABLE #fechas_tiempo;
+    -- Inserción explícita de las 4 temporadas requeridas en las métricas
+    INSERT INTO [BASADOS_DE_DATOS].BI_dimension_temporada (temporada)
+    VALUES ('Verano (Enero - Marzo)'), ('Otoño (Abril - Junio)'), ('Invierno (Julio - Septiembre)'), ('Primavera (Octubre - Diciembre)');
 
--- RANGO ETARIO CLIENTE (4 rangos segun enunciado)
-INSERT INTO [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente (rango)
-VALUES ('Menores de 25'), ('Entre 25 y 35'), ('Entre 35 y 50'), ('Mayores de 50');
+    -- Inserción explícita de la clasificación de servicio (Directa o Personalizada)
+    INSERT INTO [BASADOS_DE_DATOS].BI_dimension_tipo_servicio (tipo)
+    VALUES ('Venta Directa'), ('Propuesta a Medida');
 
--- RANGO ETARIO AGENTE (3 rangos segun enunciado)
-INSERT INTO [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente (rango)
-VALUES ('Entre 25 y 35'), ('Entre 35 y 50'), ('Mayores de 50');
+    -- Se copian los catálogos del sistema transaccional referidos a Canales de Venta
+    INSERT INTO [BASADOS_DE_DATOS].BI_dimension_canal_de_venta (canal)
+    SELECT cana_nombre FROM [BASADOS_DE_DATOS].CanalVenta;
 
--- TEMPORADA (trimestres calendario segun enunciado)
-INSERT INTO [BASADOS_DE_DATOS].BI_dimension_temporada (temporada)
-VALUES ('Verano'), ('Otoño'), ('Invierno'), ('Primavera');
+    -- Se copian los catálogos del sistema transaccional referidos a Estados de Propuestas
+    INSERT INTO [BASADOS_DE_DATOS].BI_dimension_estado_propuesta (estado)
+    SELECT esta_nombre FROM [BASADOS_DE_DATOS].EstadoPropuesta;
 
--- TIPO DE SERVICIO
-INSERT INTO [BASADOS_DE_DATOS].BI_dimension_tipo_servicio (tipo)
-VALUES ('Venta Directa'), ('Propuesta a Medida');
-
--- CANAL DE VENTA
-INSERT INTO [BASADOS_DE_DATOS].BI_dimension_canal_de_venta (canal)
-SELECT DISTINCT cana_nombre
-FROM [BASADOS_DE_DATOS].CanalVenta
-WHERE cana_nombre IS NOT NULL;
-
--- ESTADO DE PROPUESTA
-INSERT INTO [BASADOS_DE_DATOS].BI_dimension_estado_propuesta (estado)
-SELECT DISTINCT esta_nombre
-FROM [BASADOS_DE_DATOS].EstadoPropuesta
-WHERE esta_nombre IS NOT NULL;
-
--- DETALLE DE ASPECTO
-INSERT INTO [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto (detalle)
-SELECT DISTINCT aspe_detalle
-FROM [BASADOS_DE_DATOS].Aspecto
-WHERE aspe_detalle IS NOT NULL;
-
+    -- Se extraen y unifican todos los aspectos evaluables presentes en las encuestas
+    INSERT INTO [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto (detalle)
+    SELECT DISTINCT aspe_detalle FROM [BASADOS_DE_DATOS].Aspecto WHERE aspe_detalle IS NOT NULL;
+END
 GO
 
-/* ===========================================================================
-   4) DML - CARGA DE HECHOS (desde el modelo transaccional)
-   =========================================================================== */
+-- Stored Procedure principal que extrae la volumetría del sistema e inserta las tablas de hechos mediante cruces con dimensiones
+CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_hechos_bi
+AS
+BEGIN
+    -- Migración de la tabla Hechos de Venta: Determina el tipo de servicio mediante un LEFT JOIN contra las ventas originadas en propuestas
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_venta (rango_etario_cliente, canal_de_venta, tiempo, tipo_servicio, importe_total)
+    SELECT 
+        rc.id_rango_etario_cliente,
+        cv.id_canal_de_venta,
+        t.id_tiempo,
+        ts.id_tipo_servicio,
+        v.vent_importe_total
+    FROM [BASADOS_DE_DATOS].Venta v
+    JOIN [BASADOS_DE_DATOS].Cliente c ON v.vent_cliente = c.clie_codigo
+    JOIN [BASADOS_DE_DATOS].CanalVenta canal ON v.vent_canal_venta = canal.cana_codigo
+    JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON YEAR(v.vent_fecha) = t.anyo AND MONTH(v.vent_fecha) = t.mes
+    JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON rc.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(c.clie_fecha_nacimiento, v.vent_fecha))
+    JOIN [BASADOS_DE_DATOS].BI_dimension_canal_de_venta cv ON cv.canal = canal.cana_nombre
+    LEFT JOIN [BASADOS_DE_DATOS].Venta_Propuesta vp ON vp.vpro_venta = v.vent_codigo
+    JOIN [BASADOS_DE_DATOS].BI_dimension_tipo_servicio ts ON ts.tipo = CASE WHEN vp.vpro_propuesta IS NULL THEN 'Venta Directa' ELSE 'Propuesta a Medida' END;
 
--- HECHO VENTA: una fila por venta.
--- Staging con los atributos calculados (edad del cliente, tipo de servicio).
-SELECT
-    ven.vent_codigo,
-    ven.vent_fecha,
-    ven.vent_importe_total,
-    cv.cana_nombre,
-    -- edad del cliente (anios cumplidos a la fecha actual)
-    DATEDIFF(YEAR, cli.clie_fecha_nacimiento, GETDATE())
-        - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, cli.clie_fecha_nacimiento, GETDATE()), cli.clie_fecha_nacimiento) > GETDATE()
-               THEN 1 ELSE 0 END AS edad_cliente,
-    -- tipo de servicio: si la venta esta ligada a una propuesta -> a medida
-    CASE WHEN EXISTS (
-            SELECT 1 FROM [BASADOS_DE_DATOS].Venta_Propuesta vp
-            WHERE vp.vpro_venta = ven.vent_codigo
-         ) THEN 'Propuesta a Medida' ELSE 'Venta Directa' END AS tipo
-INTO #stg_venta
-FROM [BASADOS_DE_DATOS].Venta ven
-LEFT JOIN [BASADOS_DE_DATOS].Cliente    cli ON cli.clie_codigo = ven.vent_cliente
-LEFT JOIN [BASADOS_DE_DATOS].CanalVenta cv  ON cv.cana_codigo  = ven.vent_canal_venta;
+    -- Migración de la tabla Hechos de Solicitud: Calcula matemáticamente los días de anticipación de una solicitud respecto al inicio previsto
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_solicitud (tiempo, temporada, rango_etario_cliente, dias_anticipacion)
+    SELECT 
+        t.id_tiempo,
+        temp.id_temporada,
+        rc.id_rango_etario_cliente,
+        DATEDIFF(DAY, s.soli_fecha, s.soli_inicio_tentativa) as dias_anticipacion
+    FROM [BASADOS_DE_DATOS].Solicitud s
+    JOIN [BASADOS_DE_DATOS].Cliente c ON s.soli_cliente = c.clie_codigo
+    JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON YEAR(s.soli_fecha) = t.anyo AND MONTH(s.soli_fecha) = t.mes
+    JOIN [BASADOS_DE_DATOS].BI_dimension_temporada temp ON temp.temporada = [BASADOS_DE_DATOS].fn_temporada(s.soli_inicio_tentativa)
+    JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON rc.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(c.clie_fecha_nacimiento, s.soli_fecha));
 
-INSERT INTO [BASADOS_DE_DATOS].BI_hecho_venta
-    (rango_etario_cliente, canal_de_venta, tiempo, tipo_servicio, importe_total)
-SELECT
-    rec.id_rango_etario_cliente,
-    cdv.id_canal_de_venta,
-    t.id_tiempo,
-    ts.id_tipo_servicio,
-    v.vent_importe_total
-FROM #stg_venta v
-JOIN [BASADOS_DE_DATOS].BI_dimension_tipo_servicio ts
-    ON ts.tipo = v.tipo
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_canal_de_venta cdv
-    ON cdv.canal = v.cana_nombre
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t
-    ON t.anyo = YEAR(v.vent_fecha) AND t.mes = MONTH(v.vent_fecha)
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rec
-    ON rec.rango = CASE
-        WHEN v.edad_cliente <= 25 THEN 'Menores de 25'
-        WHEN v.edad_cliente <= 35 THEN 'Entre 25 y 35'
-        WHEN v.edad_cliente <= 50 THEN 'Entre 35 y 50'
-        ELSE 'Mayores de 50'
-    END;
+    -- Migración de la tabla Hechos de Propuestas: Resuelve los cruces temporales, el tiempo de respuesta del agente y el desvío monetario
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_propuesta (estado_propuesta, temporada_inicio_viaje, tiempo_emision_propuesta, tiempo_inicio_viaje, tiempo_fecha_solicitud, rango_etario_agente, dias_entre_solicitud_y_propuesta, importe_total, desvio_presupuesto_importe)
+    SELECT 
+        ep.id_estado_propuesta,
+        temp.id_temporada,
+        t_emi.id_tiempo,
+        t_ini.id_tiempo,
+        t_sol.id_tiempo,
+        ra.id_rango_etario_agente,
+        DATEDIFF(DAY, s.soli_fecha, p.prop_fecha_emision),
+        p.prop_importe_total,
+        (p.prop_importe_total - s.soli_presupuesto_estimado) as desvio_presupuesto_importe
+    FROM [BASADOS_DE_DATOS].Propuesta p
+    JOIN [BASADOS_DE_DATOS].Solicitud s ON p.prop_solicitud = s.soli_numero
+    JOIN [BASADOS_DE_DATOS].EstadoPropuesta e ON p.prop_estado = e.esta_codigo
+    JOIN [BASADOS_DE_DATOS].Agente a ON p.prop_agente = a.agen_legajo
+    JOIN [BASADOS_DE_DATOS].BI_dimension_estado_propuesta ep ON ep.estado = e.esta_nombre
+    JOIN [BASADOS_DE_DATOS].BI_dimension_temporada temp ON temp.temporada = [BASADOS_DE_DATOS].fn_temporada(p.prop_fecha_desde)
+    JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_emi ON YEAR(p.prop_fecha_emision) = t_emi.anyo AND MONTH(p.prop_fecha_emision) = t_emi.mes
+    JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_ini ON YEAR(p.prop_fecha_desde) = t_ini.anyo AND MONTH(p.prop_fecha_desde) = t_ini.mes
+    JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_sol ON YEAR(s.soli_fecha) = t_sol.anyo AND MONTH(s.soli_fecha) = t_sol.mes
+    JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente ra ON ra.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(a.agen_fecha_nacimiento, p.prop_fecha_emision));
 
-DROP TABLE #stg_venta;
+    -- Migración de la tabla Hechos Aspecto: Desdobla las respuestas individuales de las encuestas
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_aspecto (tiempo, detalle_aspecto, puntaje)
+    SELECT 
+        t.id_tiempo,
+        da.id_detalle_aspecto,
+        a.aspe_puntaje
+    FROM [BASADOS_DE_DATOS].Aspecto a
+    JOIN [BASADOS_DE_DATOS].Encuesta e ON a.aspe_encuesta = e.encu_codigo
+    JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON YEAR(e.encu_fecha) = t.anyo AND MONTH(e.encu_fecha) = t.mes
+    JOIN [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto da ON da.detalle = a.aspe_detalle;
 
-
--- HECHO SOLICITUD: una fila por solicitud.
--- Staging con la edad del cliente calculada.
-SELECT
-    sol.soli_numero,
-    sol.soli_fecha,
-    sol.soli_inicio_tentativa,
-    DATEDIFF(YEAR, cli.clie_fecha_nacimiento, GETDATE())
-        - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, cli.clie_fecha_nacimiento, GETDATE()), cli.clie_fecha_nacimiento) > GETDATE()
-               THEN 1 ELSE 0 END AS edad_cliente
-INTO #stg_solicitud
-FROM [BASADOS_DE_DATOS].Solicitud sol
-LEFT JOIN [BASADOS_DE_DATOS].Cliente cli ON cli.clie_codigo = sol.soli_cliente;
-
-INSERT INTO [BASADOS_DE_DATOS].BI_hecho_solicitud
-    (tiempo, temporada, rango_etario_cliente, dias_anticipacion)
-SELECT
-    t.id_tiempo,
-    temp.id_temporada,
-    rec.id_rango_etario_cliente,
-    DATEDIFF(DAY, s.soli_fecha, s.soli_inicio_tentativa) AS dias_anticipacion
-FROM #stg_solicitud s
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t
-    ON t.anyo = YEAR(s.soli_fecha) AND t.mes = MONTH(s.soli_fecha)
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_temporada temp
-    ON temp.temporada = CASE
-        WHEN MONTH(s.soli_inicio_tentativa) IN (1, 2, 3)   THEN 'Verano'
-        WHEN MONTH(s.soli_inicio_tentativa) IN (4, 5, 6)   THEN 'Otoño'
-        WHEN MONTH(s.soli_inicio_tentativa) IN (7, 8, 9)   THEN 'Invierno'
-        WHEN MONTH(s.soli_inicio_tentativa) IN (10, 11, 12) THEN 'Primavera'
-    END
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rec
-    ON rec.rango = CASE
-        WHEN s.edad_cliente <= 25 THEN 'Menores de 25'
-        WHEN s.edad_cliente <= 35 THEN 'Entre 25 y 35'
-        WHEN s.edad_cliente <= 50 THEN 'Entre 35 y 50'
-        ELSE 'Mayores de 50'
-    END;
-
-DROP TABLE #stg_solicitud;
-
-
--- HECHO PROPUESTA: una fila por propuesta.
--- Staging con la edad del agente y los datos de la solicitud asociada.
-SELECT
-    pro.prop_codigo,
-    pro.prop_fecha_emision,
-    pro.prop_fecha_desde,
-    pro.prop_importe_total,
-    ep2.esta_nombre,
-    sol.soli_fecha,
-    sol.soli_presupuesto_estimado,
-    DATEDIFF(YEAR, age.agen_fecha_nacimiento, GETDATE())
-        - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, age.agen_fecha_nacimiento, GETDATE()), age.agen_fecha_nacimiento) > GETDATE()
-               THEN 1 ELSE 0 END AS edad_agente
-INTO #stg_propuesta
-FROM [BASADOS_DE_DATOS].Propuesta pro
-LEFT JOIN [BASADOS_DE_DATOS].Solicitud       sol ON sol.soli_numero  = pro.prop_solicitud
-LEFT JOIN [BASADOS_DE_DATOS].Agente          age ON age.agen_legajo  = pro.prop_agente
-LEFT JOIN [BASADOS_DE_DATOS].EstadoPropuesta ep2 ON ep2.esta_codigo  = pro.prop_estado;
-
-INSERT INTO [BASADOS_DE_DATOS].BI_hecho_propuesta
-    (estado_propuesta, temporada_inicio_viaje, tiempo_emision_propuesta,
-     tiempo_inicio_viaje, tiempo_fecha_solicitud, rango_etario_agente,
-     dias_entre_solicitud_y_propuesta, importe_total, desvio_presupuesto_importe)
-SELECT
-    ep.id_estado_propuesta,
-    temp.id_temporada,
-    t_emi.id_tiempo,
-    t_ini.id_tiempo,
-    t_sol.id_tiempo,
-    rea.id_rango_etario_agente,
-    DATEDIFF(DAY, p.soli_fecha, p.prop_fecha_emision)   AS dias_entre_solicitud_y_propuesta,
-    p.prop_importe_total,
-    p.prop_importe_total - p.soli_presupuesto_estimado  AS desvio_presupuesto_importe
-FROM #stg_propuesta p
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_estado_propuesta ep
-    ON ep.estado = p.esta_nombre
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_temporada temp
-    ON temp.temporada = CASE
-        WHEN MONTH(p.prop_fecha_desde) IN (1, 2, 3)    THEN 'Verano'
-        WHEN MONTH(p.prop_fecha_desde) IN (4, 5, 6)    THEN 'Otoño'
-        WHEN MONTH(p.prop_fecha_desde) IN (7, 8, 9)    THEN 'Invierno'
-        WHEN MONTH(p.prop_fecha_desde) IN (10, 11, 12) THEN 'Primavera'
-    END
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_emi
-    ON t_emi.anyo = YEAR(p.prop_fecha_emision) AND t_emi.mes = MONTH(p.prop_fecha_emision)
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_ini
-    ON t_ini.anyo = YEAR(p.prop_fecha_desde) AND t_ini.mes = MONTH(p.prop_fecha_desde)
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_sol
-    ON t_sol.anyo = YEAR(p.soli_fecha) AND t_sol.mes = MONTH(p.soli_fecha)
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente rea
-    ON rea.rango = CASE
-        WHEN p.edad_agente <= 35 THEN 'Entre 25 y 35'
-        WHEN p.edad_agente <= 50 THEN 'Entre 35 y 50'
-        ELSE 'Mayores de 50'
-    END;
-
-DROP TABLE #stg_propuesta;
-
-
--- HECHO ASPECTO: una fila por aspecto puntuado en una encuesta.
--- Staging con el aspecto y la fecha de la encuesta a la que pertenece.
-SELECT
-    asp.aspe_detalle,
-    asp.aspe_puntaje,
-    enc.encu_fecha
-INTO #stg_aspecto
-FROM [BASADOS_DE_DATOS].Aspecto asp
-LEFT JOIN [BASADOS_DE_DATOS].Encuesta enc ON enc.encu_codigo = asp.aspe_encuesta;
-
-INSERT INTO [BASADOS_DE_DATOS].BI_hecho_aspecto
-    (tiempo, detalle_aspecto, puntaje)
-SELECT
-    t.id_tiempo,
-    da.id_detalle_aspecto,
-    a.aspe_puntaje
-FROM #stg_aspecto a
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto da
-    ON da.detalle = a.aspe_detalle
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t
-    ON t.anyo = YEAR(a.encu_fecha) AND t.mes = MONTH(a.encu_fecha);
-
-DROP TABLE #stg_aspecto;
-
-
--- HECHO ENCUESTA: una fila por encuesta (puntaje = promedio de sus aspectos).
--- Primero pre-agregamos el promedio de puntaje por encuesta en una temporal
--- (evita una subconsulta escalar correlacionada fila por fila).
-SELECT
-    asp.aspe_encuesta,
-    AVG(CAST(asp.aspe_puntaje AS float)) AS puntaje_promedio
-INTO #prom_encuesta
-FROM [BASADOS_DE_DATOS].Aspecto asp
-WHERE asp.aspe_encuesta IS NOT NULL
-GROUP BY asp.aspe_encuesta;
-
--- Staging de encuestas con la edad del agente y el promedio ya calculado.
-SELECT
-    enc.encu_codigo,
-    enc.encu_fecha,
-    DATEDIFF(YEAR, age.agen_fecha_nacimiento, GETDATE())
-        - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, age.agen_fecha_nacimiento, GETDATE()), age.agen_fecha_nacimiento) > GETDATE()
-               THEN 1 ELSE 0 END AS edad_agente,
-    pe.puntaje_promedio
-INTO #stg_encuesta
-FROM [BASADOS_DE_DATOS].Encuesta enc
-LEFT JOIN [BASADOS_DE_DATOS].Agente age ON age.agen_legajo = enc.encu_agente
-LEFT JOIN #prom_encuesta pe ON pe.aspe_encuesta = enc.encu_codigo;
-
-INSERT INTO [BASADOS_DE_DATOS].BI_hecho_encuesta
-    (rango_etario_agente, tiempo, puntaje)
-SELECT
-    rea.id_rango_etario_agente,
-    t.id_tiempo,
-    CAST(ROUND(e.puntaje_promedio, 0) AS int) AS puntaje
-FROM #stg_encuesta e
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t
-    ON t.anyo = YEAR(e.encu_fecha) AND t.mes = MONTH(e.encu_fecha)
-LEFT JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente rea
-    ON rea.rango = CASE
-        WHEN e.edad_agente <= 35 THEN 'Entre 25 y 35'
-        WHEN e.edad_agente <= 50 THEN 'Entre 35 y 50'
-        ELSE 'Mayores de 50'
-    END;
-
-DROP TABLE #stg_encuesta;
-DROP TABLE #prom_encuesta;
-
+    -- Migración de la tabla Hechos de Encuestas (Satisfacción Promedio): Genera una sola fila por encuesta con la media de sus preguntas
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_encuesta (rango_etario_agente, tiempo, puntaje)
+    SELECT 
+        ra.id_rango_etario_agente,
+        t.id_tiempo,
+        AVG(CAST(asp.aspe_puntaje AS DECIMAL(18,2))) as puntaje_promedio
+    FROM [BASADOS_DE_DATOS].Encuesta e
+    JOIN [BASADOS_DE_DATOS].Aspecto asp ON e.encu_codigo = asp.aspe_encuesta
+    JOIN [BASADOS_DE_DATOS].Agente ag ON e.encu_agente = ag.agen_legajo
+    JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON YEAR(e.encu_fecha) = t.anyo AND MONTH(e.encu_fecha) = t.mes
+    JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente ra ON ra.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(ag.agen_fecha_nacimiento, e.encu_fecha))
+    GROUP BY ra.id_rango_etario_agente, t.id_tiempo, e.encu_codigo;
+END
 GO
 
-/* ===========================================================================
-   5) VISTAS DE INDICADORES DE NEGOCIO (1 a 10 del enunciado)
-   Cada vista consulta directamente el modelo estrella ya cargado.
-   =========================================================================== */
+-- ========================================================================================
+-- 9. EJECUCIÓN DE PROCEDIMIENTOS DE MIGRACIÓN
+-- ========================================================================================
+-- Se ejecutan en orden lógico: las dimensiones primero y luego las tablas de hechos que las consumen.
+EXEC [BASADOS_DE_DATOS].sp_migrar_dimensiones_bi;
+EXEC [BASADOS_DE_DATOS].sp_migrar_hechos_bi;
+GO
 
--- 1) Ticket promedio: valor promedio de venta MENSUAL segun rango etario de
---    cliente y canal de venta.
-CREATE VIEW [BASADOS_DE_DATOS].BI_vista_ticket_promedio AS
-SELECT
-    t.anyo,
-    t.mes,
-    rec.rango AS rango_etario_cliente,
-    cdv.canal AS canal_venta,
-    AVG(hv.importe_total) AS ticket_promedio
+-- ========================================================================================
+-- 10. CREACIÓN DE VISTAS (TABLEROS DE CONTROL)
+-- ========================================================================================
+
+-- Vista 1. Ticket promedio: Valor promedio de venta mensual según rango etario de cliente y canal de venta.
+-- Utiliza AVG sobre los importes agrupados por edad, canal, año y mes.
+CREATE VIEW [BASADOS_DE_DATOS].V_BI_Ticket_Promedio AS
+SELECT 
+    t.anyo as Anio,
+    t.mes as Mes,
+    rc.rango as Rango_Etario_Cliente,
+    cv.canal as Canal_Venta,
+    AVG(hv.importe_total) as Ticket_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_venta hv
-JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo               t   ON t.id_tiempo  = hv.tiempo
-JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rec ON rec.id_rango_etario_cliente = hv.rango_etario_cliente
-JOIN [BASADOS_DE_DATOS].BI_dimension_canal_de_venta       cdv ON cdv.id_canal_de_venta = hv.canal_de_venta
-GROUP BY t.anyo, t.mes, rec.rango, cdv.canal;
+JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON hv.tiempo = t.id_tiempo
+JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON hv.rango_etario_cliente = rc.id_rango_etario_cliente
+JOIN [BASADOS_DE_DATOS].BI_dimension_canal_de_venta cv ON hv.canal_de_venta = cv.id_canal_de_venta
+GROUP BY t.anyo, t.mes, rc.rango, cv.canal;
 GO
 
--- 2) Distribucion de facturacion: porcentaje de facturacion de cada tipo de
---    servicio (Venta Directa / Propuesta a Medida) por cuatrimestre de cada anyo.
---    El total del cuatrimestre se obtiene con una subconsulta correlacionada
---    (sin funciones de ventana / PARTITION BY).
-CREATE VIEW [BASADOS_DE_DATOS].BI_vista_distribucion_facturacion AS
-SELECT
-    t.anyo,
-    t.cuatrimestre,
-    ts.tipo AS tipo_servicio,
-    SUM(hv.importe_total) AS facturacion_tipo,
-    CAST(100.0 * SUM(hv.importe_total)
-         / (SELECT SUM(hv2.importe_total)
-            FROM [BASADOS_DE_DATOS].BI_hecho_venta hv2
-            JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t2 ON t2.id_tiempo = hv2.tiempo
-            WHERE t2.anyo = t.anyo AND t2.cuatrimestre = t.cuatrimestre)
-         AS DECIMAL(18,2)) AS porcentaje_facturacion
+-- Vista 2. Distribución de Facturación: Porcentaje correspondiente a cada tipo de servicio por cuatrimestre y año.
+-- Aplica una subconsulta escalar en el SELECT para obtener el total del cuatrimestre sin usar particiones.
+CREATE VIEW [BASADOS_DE_DATOS].V_BI_Distribucion_Facturacion AS
+SELECT 
+    t.anyo as Anio,
+    t.cuatrimestre as Cuatrimestre,
+    ts.tipo as Tipo_Servicio,
+    SUM(hv.importe_total) * 100.0 / (
+        SELECT SUM(hv2.importe_total)
+        FROM [BASADOS_DE_DATOS].BI_hecho_venta hv2
+        JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t2 ON hv2.tiempo = t2.id_tiempo
+        WHERE t2.anyo = t.anyo AND t2.cuatrimestre = t.cuatrimestre
+    ) as Porcentaje_Facturacion
 FROM [BASADOS_DE_DATOS].BI_hecho_venta hv
-JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo        t  ON t.id_tiempo         = hv.tiempo
-JOIN [BASADOS_DE_DATOS].BI_dimension_tipo_servicio ts ON ts.id_tipo_servicio = hv.tipo_servicio
+JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON hv.tiempo = t.id_tiempo
+JOIN [BASADOS_DE_DATOS].BI_dimension_tipo_servicio ts ON hv.tipo_servicio = ts.id_tipo_servicio
 GROUP BY t.anyo, t.cuatrimestre, ts.tipo;
 GO
 
--- 3) Ranking de solicitudes por temporada: cantidad de solicitudes por
---    temporada de cada anyo y rango etario del cliente.
---    El "ranking" se obtiene ordenando por cantidad_solicitudes DESC al consultar
---    la vista (sin funciones de ventana / PARTITION BY).
-CREATE VIEW [BASADOS_DE_DATOS].BI_vista_ranking_solicitudes_temporada AS
-SELECT
-    t.anyo,
-    temp.temporada,
-    rec.rango AS rango_etario_cliente,
-    COUNT(*) AS cantidad_solicitudes
+-- Vista 3. Ranking de solicitudes por temporadas: Cantidad realizadas por temporada y rango etario.
+-- Cuenta el número absoluto de filas de solicitudes agrupando por las dimensiones descritas.
+CREATE VIEW [BASADOS_DE_DATOS].V_BI_Ranking_Solicitudes_Temporada AS
+SELECT 
+    t.anyo as Anio,
+    temp.temporada as Temporada,
+    rc.rango as Rango_Etario_Cliente,
+    COUNT(*) as Cantidad_Solicitudes
 FROM [BASADOS_DE_DATOS].BI_hecho_solicitud hs
-JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo               t    ON t.id_tiempo       = hs.tiempo
-JOIN [BASADOS_DE_DATOS].BI_dimension_temporada            temp ON temp.id_temporada = hs.temporada
-JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rec  ON rec.id_rango_etario_cliente = hs.rango_etario_cliente
-GROUP BY t.anyo, temp.temporada, rec.rango;
+JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON hs.tiempo = t.id_tiempo
+JOIN [BASADOS_DE_DATOS].BI_dimension_temporada temp ON hs.temporada = temp.id_temporada
+JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON hs.rango_etario_cliente = rc.id_rango_etario_cliente
+GROUP BY t.anyo, temp.temporada, rc.rango;
 GO
 
--- 4) Anticipacion promedio de solicitudes: promedio de dias entre la fecha de
---    solicitud y la fecha de inicio tentativa, por rango etario cliente y cuatrimestre.
-CREATE VIEW [BASADOS_DE_DATOS].BI_vista_anticipacion_promedio AS
-SELECT
-    t.anyo,
-    t.cuatrimestre,
-    rec.rango AS rango_etario_cliente,
-    AVG(CAST(hs.dias_anticipacion AS DECIMAL(18,2))) AS dias_anticipacion_promedio
+-- Vista 4. Anticipación promedio de solicitudes: Promedio de días calculados en la migración por rango etario y cuatrimestre.
+CREATE VIEW [BASADOS_DE_DATOS].V_BI_Anticipacion_Solicitudes AS
+SELECT 
+    t.anyo as Anio,
+    t.cuatrimestre as Cuatrimestre,
+    rc.rango as Rango_Etario_Cliente,
+    AVG(CAST(hs.dias_anticipacion as decimal(18,2))) as Anticipacion_Promedio_Dias
 FROM [BASADOS_DE_DATOS].BI_hecho_solicitud hs
-JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo               t   ON t.id_tiempo  = hs.tiempo
-JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rec ON rec.id_rango_etario_cliente = hs.rango_etario_cliente
-GROUP BY t.anyo, t.cuatrimestre, rec.rango;
+JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON hs.tiempo = t.id_tiempo
+JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON hs.rango_etario_cliente = rc.id_rango_etario_cliente
+GROUP BY t.anyo, t.cuatrimestre, rc.rango;
 GO
 
--- 5) Tasa de aceptacion de propuestas: porcentaje de propuestas aceptadas sobre
---    el total emitidas, por cuatrimestre (referencia: fecha de emision).
---    NOTA: verificar el literal del estado contra BI_dimension_estado_propuesta.
-CREATE VIEW [BASADOS_DE_DATOS].BI_vista_tasa_aceptacion_propuestas AS
-SELECT
-    t.anyo,
-    t.cuatrimestre,
-    COUNT(*) AS total_propuestas,
-    SUM(CASE WHEN ep.estado COLLATE Latin1_General_CI_AI = 'Aceptada' THEN 1 ELSE 0 END) AS propuestas_aceptadas,
-    CAST(100.0 * SUM(CASE WHEN ep.estado COLLATE Latin1_General_CI_AI = 'Aceptada' THEN 1 ELSE 0 END)
-         / COUNT(*) AS DECIMAL(18,2)) AS tasa_aceptacion
+-- Vista 5. Tasa de aceptación de propuestas: Porcentaje aceptado respecto del total emitido en un cuatrimestre.
+-- Se vale de la expresión lógica CASE para contar las favorables sobre la población total.
+CREATE VIEW [BASADOS_DE_DATOS].V_BI_Tasa_Aceptacion_Propuestas AS
+SELECT 
+    t.anyo as Anio,
+    t.cuatrimestre as Cuatrimestre,
+    CAST(SUM(CASE WHEN ep.estado LIKE '%ceptad%' THEN 1 ELSE 0 END) AS DECIMAL) * 100.0 / COUNT(*) as Tasa_Aceptacion_Porcentaje
 FROM [BASADOS_DE_DATOS].BI_hecho_propuesta hp
-JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo           t  ON t.id_tiempo           = hp.tiempo_emision_propuesta
-JOIN [BASADOS_DE_DATOS].BI_dimension_estado_propuesta ep ON ep.id_estado_propuesta = hp.estado_propuesta
+JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON hp.tiempo_emision_propuesta = t.id_tiempo
+JOIN [BASADOS_DE_DATOS].BI_dimension_estado_propuesta ep ON hp.estado_propuesta = ep.id_estado_propuesta
 GROUP BY t.anyo, t.cuatrimestre;
 GO
 
--- 6) Cotizacion promedio por temporada: importe promedio de las propuestas
---    emitidas por temporada/anyo (referencia: fecha de inicio del viaje).
-CREATE VIEW [BASADOS_DE_DATOS].BI_vista_cotizacion_promedio_temporada AS
-SELECT
-    t.anyo,
-    temp.temporada,
-    AVG(hp.importe_total) AS cotizacion_promedio
+-- Vista 6. Cotización promedio por temporada: Referencia tomada directamente de la fecha inicial planificada para el viaje.
+CREATE VIEW [BASADOS_DE_DATOS].V_BI_Cotizacion_Promedio_Temporada AS
+SELECT 
+    t_ini.anyo as Anio_Inicio_Viaje,
+    temp.temporada as Temporada_Inicio_Viaje,
+    AVG(hp.importe_total) as Cotizacion_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_propuesta hp
-JOIN [BASADOS_DE_DATOS].BI_dimension_temporada temp ON temp.id_temporada = hp.temporada_inicio_viaje
-JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo    t    ON t.id_tiempo       = hp.tiempo_inicio_viaje
-GROUP BY t.anyo, temp.temporada;
+JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_ini ON hp.tiempo_inicio_viaje = t_ini.id_tiempo
+JOIN [BASADOS_DE_DATOS].BI_dimension_temporada temp ON hp.temporada_inicio_viaje = temp.id_temporada
+GROUP BY t_ini.anyo, temp.temporada;
 GO
 
--- 7) Tiempo promedio de respuesta: dias promedio entre la fecha de solicitud y
---    la de emision de la propuesta, por rango etario agente y mes
---    (referencia temporal: fecha de solicitud).
-CREATE VIEW [BASADOS_DE_DATOS].BI_vista_tiempo_promedio_respuesta AS
-SELECT
-    t.anyo,
-    t.mes,
-    rea.rango AS rango_etario_agente,
-    AVG(CAST(hp.dias_entre_solicitud_y_propuesta AS DECIMAL(18,2))) AS dias_respuesta_promedio
+-- Vista 7. Tiempo promedio de respuesta: Calcula la brecha temporal promedio en que tarda un agente en enviar una cotización.
+CREATE VIEW [BASADOS_DE_DATOS].V_BI_Tiempo_Respuesta AS
+SELECT 
+    t_sol.anyo as Anio_Solicitud,
+    t_sol.mes as Mes_Solicitud,
+    ra.rango as Rango_Etario_Agente,
+    AVG(CAST(hp.dias_entre_solicitud_y_propuesta as decimal(18,2))) as Tiempo_Respuesta_Dias
 FROM [BASADOS_DE_DATOS].BI_hecho_propuesta hp
-JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo              t   ON t.id_tiempo  = hp.tiempo_fecha_solicitud
-JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente rea ON rea.id_rango_etario_agente = hp.rango_etario_agente
-GROUP BY t.anyo, t.mes, rea.rango;
+JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_sol ON hp.tiempo_fecha_solicitud = t_sol.id_tiempo
+JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente ra ON hp.rango_etario_agente = ra.id_rango_etario_agente
+GROUP BY t_sol.anyo, t_sol.mes, ra.rango;
 GO
 
--- 8) Desvio de presupuesto: desvio promedio entre el importe de la propuesta y
---    el presupuesto estimado de la solicitud, por anyo/cuatrimestre de emision
---    (segmentacion definida por el grupo; el enunciado no la fija).
-CREATE VIEW [BASADOS_DE_DATOS].BI_vista_desvio_presupuesto AS
-SELECT
-    t.anyo,
-    t.cuatrimestre,
-    AVG(hp.desvio_presupuesto_importe) AS desvio_promedio
+-- Vista 8. Desvío de presupuesto: Indica cuánto se apartan las propuestas financieras generadas del presupuesto meta del cliente.
+CREATE VIEW [BASADOS_DE_DATOS].V_BI_Desvio_Presupuesto AS
+SELECT 
+    t_emi.anyo as Anio_Emision,
+    t_emi.mes as Mes_Emision,
+    AVG(hp.desvio_presupuesto_importe) as Desvio_Presupuesto_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_propuesta hp
-JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON t.id_tiempo = hp.tiempo_emision_propuesta
-GROUP BY t.anyo, t.cuatrimestre;
+JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_emi ON hp.tiempo_emision_propuesta = t_emi.id_tiempo
+GROUP BY t_emi.anyo, t_emi.mes;
 GO
 
--- 9) Ranking de aspectos mejor y peor valorados: puntaje promedio por aspecto y
---    cuatrimestre. Ordenando por puntaje_promedio DESC se obtiene el mejor valorado
---    y ASC el peor, dentro de cada anyo/cuatrimestre (sin funciones de ventana).
-CREATE VIEW [BASADOS_DE_DATOS].BI_vista_ranking_aspectos AS
-SELECT
-    t.anyo,
-    t.cuatrimestre,
-    da.detalle AS aspecto,
-    AVG(CAST(ha.puntaje AS DECIMAL(18,2))) AS puntaje_promedio
+-- Vista 9. Ranking de aspectos mejor y peor valorados: Ordena el desempeño general de los atributos auditados.
+-- Utiliza TOP y ORDER BY para dejar los resultados inherentemente ordenados y conformar el ranking directamente.
+CREATE VIEW [BASADOS_DE_DATOS].V_BI_Ranking_Aspectos AS
+SELECT TOP(100) PERCENT
+    t.anyo as Anio,
+    t.cuatrimestre as Cuatrimestre,
+    da.detalle as Aspecto,
+    AVG(CAST(ha.puntaje as decimal(18,2))) as Puntaje_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_aspecto ha
-JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo          t  ON t.id_tiempo          = ha.tiempo
-JOIN [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto da ON da.id_detalle_aspecto = ha.detalle_aspecto
-GROUP BY t.anyo, t.cuatrimestre, da.detalle;
+JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON ha.tiempo = t.id_tiempo
+JOIN [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto da ON ha.detalle_aspecto = da.id_detalle_aspecto
+GROUP BY t.anyo, t.cuatrimestre, da.detalle
+ORDER BY t.anyo ASC, t.cuatrimestre ASC, Puntaje_Promedio DESC;
 GO
 
--- 10) Satisfaccion promedio por agente: puntaje promedio de las encuestas por
---     rango etario del agente y mes.
-CREATE VIEW [BASADOS_DE_DATOS].BI_vista_satisfaccion_promedio_agente AS
-SELECT
-    t.anyo,
-    t.mes,
-    rea.rango AS rango_etario_agente,
-    AVG(CAST(he.puntaje AS DECIMAL(18,2))) AS satisfaccion_promedio
+-- Vista 10. Satisfacción promedio por agente: Consolida la métrica general ponderada de la experiencia comercial brindada.
+CREATE VIEW [BASADOS_DE_DATOS].V_BI_Satisfaccion_Promedio_Agente AS
+SELECT 
+    t.anyo as Anio,
+    t.mes as Mes,
+    ra.rango as Rango_Etario_Agente,
+    AVG(he.puntaje) as Satisfaccion_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_encuesta he
-JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo              t   ON t.id_tiempo  = he.tiempo
-JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente rea ON rea.id_rango_etario_agente = he.rango_etario_agente
-GROUP BY t.anyo, t.mes, rea.rango;
+JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON he.tiempo = t.id_tiempo
+JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente ra ON he.rango_etario_agente = ra.id_rango_etario_agente
+GROUP BY t.anyo, t.mes, ra.rango;
 GO
