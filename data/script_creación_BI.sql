@@ -222,26 +222,49 @@ GO
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_dimensiones_bi
 AS
 BEGIN
-    -- Carga de la dimensión Tiempo: Unificamos todas las fechas registradas en el sistema para tener un catálogo maestro
+    -- Carga de la dimensión Tiempo: Extraemos fechas directamente con múltiples SELECTs usando UNION
     INSERT INTO [BASADOS_DE_DATOS].BI_dimension_tiempo (anyo, cuatrimestre, mes)
-    SELECT DISTINCT YEAR(fecha), 
-           CASE WHEN MONTH(fecha) BETWEEN 1 AND 4 THEN 1
-                WHEN MONTH(fecha) BETWEEN 5 AND 8 THEN 2
+    SELECT YEAR(vent_fecha), 
+           CASE WHEN MONTH(vent_fecha) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(vent_fecha) BETWEEN 5 AND 8 THEN 2
                 ELSE 3 END, 
-           MONTH(fecha)
-    FROM (
-        SELECT vent_fecha as fecha FROM [BASADOS_DE_DATOS].Venta WHERE vent_fecha IS NOT NULL
-        UNION
-        SELECT soli_fecha FROM [BASADOS_DE_DATOS].Solicitud WHERE soli_fecha IS NOT NULL
-        UNION
-        SELECT soli_inicio_tentativa FROM [BASADOS_DE_DATOS].Solicitud WHERE soli_inicio_tentativa IS NOT NULL
-        UNION
-        SELECT prop_fecha_emision FROM [BASADOS_DE_DATOS].Propuesta WHERE prop_fecha_emision IS NOT NULL
-        UNION
-        SELECT prop_fecha_desde FROM [BASADOS_DE_DATOS].Propuesta WHERE prop_fecha_desde IS NOT NULL
-        UNION
-        SELECT encu_fecha FROM [BASADOS_DE_DATOS].Encuesta WHERE encu_fecha IS NOT NULL
-    ) as Fechas;
+           MONTH(vent_fecha)
+    FROM [BASADOS_DE_DATOS].Venta WHERE vent_fecha IS NOT NULL
+    UNION
+    SELECT YEAR(soli_fecha), 
+           CASE WHEN MONTH(soli_fecha) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(soli_fecha) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(soli_fecha)
+    FROM [BASADOS_DE_DATOS].Solicitud WHERE soli_fecha IS NOT NULL
+    UNION
+    SELECT YEAR(soli_inicio_tentativa), 
+           CASE WHEN MONTH(soli_inicio_tentativa) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(soli_inicio_tentativa) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(soli_inicio_tentativa)
+    FROM [BASADOS_DE_DATOS].Solicitud WHERE soli_inicio_tentativa IS NOT NULL
+    UNION
+    SELECT YEAR(prop_fecha_emision), 
+           CASE WHEN MONTH(prop_fecha_emision) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(prop_fecha_emision) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(prop_fecha_emision)
+    FROM [BASADOS_DE_DATOS].Propuesta WHERE prop_fecha_emision IS NOT NULL
+    UNION
+    SELECT YEAR(prop_fecha_desde), 
+           CASE WHEN MONTH(prop_fecha_desde) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(prop_fecha_desde) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(prop_fecha_desde)
+    FROM [BASADOS_DE_DATOS].Propuesta WHERE prop_fecha_desde IS NOT NULL
+    UNION
+    SELECT YEAR(encu_fecha), 
+           CASE WHEN MONTH(encu_fecha) BETWEEN 1 AND 4 THEN 1
+                WHEN MONTH(encu_fecha) BETWEEN 5 AND 8 THEN 2
+                ELSE 3 END, 
+           MONTH(encu_fecha)
+    FROM [BASADOS_DE_DATOS].Encuesta WHERE encu_fecha IS NOT NULL;
 
     -- Inserción explícita de los 4 rangos etarios solicitados para clientes
     INSERT INTO [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente (rango)
@@ -385,13 +408,18 @@ GROUP BY t.anyo, t.mes, rc.rango, cv.canal;
 GO
 
 -- Vista 2. Distribución de Facturación: Porcentaje correspondiente a cada tipo de servicio por cuatrimestre y año.
--- Aplica particiones analíticas (OVER PARTITION) para calcular el 100% de la facturación del período y obtener el margen parcial.
+-- Aplica una subconsulta escalar en el SELECT para obtener el total del cuatrimestre sin usar particiones.
 CREATE VIEW [BASADOS_DE_DATOS].V_BI_Distribucion_Facturacion AS
 SELECT 
     t.anyo as Anio,
     t.cuatrimestre as Cuatrimestre,
     ts.tipo as Tipo_Servicio,
-    SUM(hv.importe_total) * 100.0 / SUM(SUM(hv.importe_total)) OVER (PARTITION BY t.anyo, t.cuatrimestre) as Porcentaje_Facturacion
+    SUM(hv.importe_total) * 100.0 / (
+        SELECT SUM(hv2.importe_total)
+        FROM [BASADOS_DE_DATOS].BI_hecho_venta hv2
+        JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t2 ON hv2.tiempo = t2.id_tiempo
+        WHERE t2.anyo = t.anyo AND t2.cuatrimestre = t.cuatrimestre
+    ) as Porcentaje_Facturacion
 FROM [BASADOS_DE_DATOS].BI_hecho_venta hv
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON hv.tiempo = t.id_tiempo
 JOIN [BASADOS_DE_DATOS].BI_dimension_tipo_servicio ts ON hv.tipo_servicio = ts.id_tipo_servicio
@@ -476,19 +504,18 @@ GROUP BY t_emi.anyo, t_emi.mes;
 GO
 
 -- Vista 9. Ranking de aspectos mejor y peor valorados: Ordena el desempeño general de los atributos auditados.
--- Utiliza funciones de partición RANK() y ordenamientos ascendentes/descendentes para determinar posiciones del ranking.
+-- Utiliza TOP y ORDER BY para dejar los resultados inherentemente ordenados y conformar el ranking directamente.
 CREATE VIEW [BASADOS_DE_DATOS].V_BI_Ranking_Aspectos AS
-SELECT 
+SELECT TOP(100) PERCENT
     t.anyo as Anio,
     t.cuatrimestre as Cuatrimestre,
     da.detalle as Aspecto,
-    AVG(CAST(ha.puntaje as decimal(18,2))) as Puntaje_Promedio,
-    RANK() OVER (PARTITION BY t.anyo, t.cuatrimestre ORDER BY AVG(CAST(ha.puntaje as decimal(18,2))) DESC) as Ranking_Mejor_Valorado,
-    RANK() OVER (PARTITION BY t.anyo, t.cuatrimestre ORDER BY AVG(CAST(ha.puntaje as decimal(18,2))) ASC) as Ranking_Peor_Valorado
+    AVG(CAST(ha.puntaje as decimal(18,2))) as Puntaje_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_aspecto ha
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON ha.tiempo = t.id_tiempo
 JOIN [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto da ON ha.detalle_aspecto = da.id_detalle_aspecto
-GROUP BY t.anyo, t.cuatrimestre, da.detalle;
+GROUP BY t.anyo, t.cuatrimestre, da.detalle
+ORDER BY t.anyo ASC, t.cuatrimestre ASC, Puntaje_Promedio DESC;
 GO
 
 -- Vista 10. Satisfacción promedio por agente: Consolida la métrica general ponderada de la experiencia comercial brindada.
