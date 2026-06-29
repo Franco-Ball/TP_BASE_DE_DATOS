@@ -2,61 +2,7 @@ USE GD1C2026
 GO
 
 -- ========================================================================================
--- 1. DROP DE VISTAS
--- ========================================================================================
--- Las siguientes sentencias eliminan las vistas de indicadores si ya existen en la base, 
--- para permitir que el script se pueda ejecutar múltiples veces sin arrojar errores de duplicidad.
-IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Ticket_Promedio', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Ticket_Promedio;
-IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Distribucion_Facturacion', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Distribucion_Facturacion;
-IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Ranking_Solicitudes_Temporada', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Ranking_Solicitudes_Temporada;
-IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Anticipacion_Solicitudes', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Anticipacion_Solicitudes;
-IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Tasa_Aceptacion_Propuestas', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Tasa_Aceptacion_Propuestas;
-IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Cotizacion_Promedio_Temporada', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Cotizacion_Promedio_Temporada;
-IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Tiempo_Respuesta', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Tiempo_Respuesta;
-IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Desvio_Presupuesto', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Desvio_Presupuesto;
-IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Ranking_Aspectos', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Ranking_Aspectos;
-IF OBJECT_ID('[BASADOS_DE_DATOS].V_BI_Satisfaccion_Promedio_Agente', 'V') IS NOT NULL DROP VIEW [BASADOS_DE_DATOS].V_BI_Satisfaccion_Promedio_Agente;
-GO
-
--- ========================================================================================
--- 2. DROP DE TABLAS DE HECHOS
--- ========================================================================================
--- Se eliminan las tablas de hechos en caso de existir, respetando el orden de dependencias 
--- (primero las tablas que contienen Foreign Keys antes que las dimensiones).
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_hecho_venta', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_hecho_venta;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_hecho_solicitud', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_hecho_solicitud;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_hecho_propuesta', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_hecho_propuesta;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_hecho_aspecto', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_hecho_aspecto;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_hecho_encuesta', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_hecho_encuesta;
-GO
-
--- ========================================================================================
--- 3. DROP DE DIMENSIONES
--- ========================================================================================
--- Se eliminan las tablas de dimensiones luego de haber eliminado las tablas de hechos que las referencian.
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_tiempo', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_tiempo;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_rango_etario_agente', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_temporada', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_temporada;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_tipo_servicio', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_tipo_servicio;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_canal_de_venta', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_canal_de_venta;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_estado_propuesta', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_estado_propuesta;
-IF OBJECT_ID('[BASADOS_DE_DATOS].BI_dimension_detalle_aspecto', 'U') IS NOT NULL DROP TABLE [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto;
-GO
-
--- ========================================================================================
--- 4. DROP DE PROCEDURES Y FUNCIONES
--- ========================================================================================
--- Se eliminan los stored procedures y funciones auxiliares generados para la carga de datos.
-IF OBJECT_ID('[BASADOS_DE_DATOS].sp_migrar_dimensiones_bi', 'P') IS NOT NULL DROP PROCEDURE [BASADOS_DE_DATOS].sp_migrar_dimensiones_bi;
-IF OBJECT_ID('[BASADOS_DE_DATOS].sp_migrar_hechos_bi', 'P') IS NOT NULL DROP PROCEDURE [BASADOS_DE_DATOS].sp_migrar_hechos_bi;
-IF OBJECT_ID('[BASADOS_DE_DATOS].fn_calcular_edad', 'FN') IS NOT NULL DROP FUNCTION [BASADOS_DE_DATOS].fn_calcular_edad;
-IF OBJECT_ID('[BASADOS_DE_DATOS].fn_rango_etario', 'FN') IS NOT NULL DROP FUNCTION [BASADOS_DE_DATOS].fn_rango_etario;
-IF OBJECT_ID('[BASADOS_DE_DATOS].fn_temporada', 'FN') IS NOT NULL DROP FUNCTION [BASADOS_DE_DATOS].fn_temporada;
-GO
-
--- ========================================================================================
--- 5. FUNCIONES AUXILIARES
+-- 1. FUNCIONES AUXILIARES
 -- ========================================================================================
 
 -- Función para calcular la edad exacta de una persona en base a su fecha de nacimiento y la fecha del evento.
@@ -94,7 +40,7 @@ END
 GO
 
 -- ========================================================================================
--- 6. CREACIÓN DE DIMENSIONES
+-- 2. CREACIÓN DE DIMENSIONES
 -- ========================================================================================
 
 -- Dimensión Tiempo: Agrupa y clasifica las fechas en años, cuatrimestres y meses.
@@ -149,7 +95,7 @@ CREATE TABLE [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto(
 GO
 
 -- ========================================================================================
--- 7. CREACIÓN DE TABLAS DE HECHOS
+-- 3. CREACIÓN DE TABLAS DE HECHOS
 -- ========================================================================================
 
 -- Hecho Venta: Registra los importes totales de las ventas asociándolas al tiempo, cliente, canal y servicio.
@@ -159,10 +105,7 @@ CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_venta(
     tiempo bigint,
     tipo_servicio bigint,
     importe_total decimal(18,2),
-    FOREIGN KEY (rango_etario_cliente) REFERENCES [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente(id_rango_etario_cliente),
-    FOREIGN KEY (canal_de_venta) REFERENCES [BASADOS_DE_DATOS].BI_dimension_canal_de_venta(id_canal_de_venta),
-    FOREIGN KEY (tiempo) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (tipo_servicio) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tipo_servicio(id_tipo_servicio)
+    PRIMARY KEY (rango_etario_cliente, canal_de_venta, tiempo, tipo_servicio)
 );
 
 -- Hecho Solicitud: Contabiliza los días de anticipación de una solicitud según la temporada y la edad del cliente.
@@ -171,9 +114,7 @@ CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_solicitud(
     temporada bigint,
     rango_etario_cliente bigint,
     dias_anticipacion int,
-    FOREIGN KEY (tiempo) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (temporada) REFERENCES [BASADOS_DE_DATOS].BI_dimension_temporada(id_temporada),
-    FOREIGN KEY (rango_etario_cliente) REFERENCES [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente(id_rango_etario_cliente)
+    PRIMARY KEY (tiempo, temporada, rango_etario_cliente)
 );
 
 -- Hecho Propuesta: Permite analizar la eficacia (tiempos de respuesta, desvíos monetarios) del trabajo de los agentes y los importes de propuestas.
@@ -187,12 +128,7 @@ CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_propuesta(
     dias_entre_solicitud_y_propuesta int,
     importe_total decimal(18,2),
     desvio_presupuesto_importe decimal(18,2),
-    FOREIGN KEY (estado_propuesta) REFERENCES [BASADOS_DE_DATOS].BI_dimension_estado_propuesta(id_estado_propuesta),
-    FOREIGN KEY (temporada_inicio_viaje) REFERENCES [BASADOS_DE_DATOS].BI_dimension_temporada(id_temporada),
-    FOREIGN KEY (tiempo_emision_propuesta) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (tiempo_inicio_viaje) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (tiempo_fecha_solicitud) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (rango_etario_agente) REFERENCES [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente(id_rango_etario_agente)
+    PRIMARY KEY (estado_propuesta, temporada_inicio_viaje, tiempo_emision_propuesta, tiempo_inicio_viaje, tiempo_fecha_solicitud, rango_etario_agente)
 );
 
 -- Hecho Aspecto: Almacena el puntaje directo de cada pregunta individual dentro de una encuesta.
@@ -200,22 +136,20 @@ CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_aspecto(
     tiempo bigint,
     detalle_aspecto bigint,
     puntaje int,
-    FOREIGN KEY (tiempo) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo),
-    FOREIGN KEY (detalle_aspecto) REFERENCES [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto(id_detalle_aspecto)
+    PRIMARY KEY (tiempo, detalle_aspecto)
 );
 
 -- Hecho Encuesta: Mide la satisfacción general (promediada) de cada atención brindada por un agente en un momento del tiempo.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_encuesta(
     rango_etario_agente bigint,
     tiempo bigint,
-    puntaje decimal(18,2), 
-    FOREIGN KEY (rango_etario_agente) REFERENCES [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente(id_rango_etario_agente),
-    FOREIGN KEY (tiempo) REFERENCES [BASADOS_DE_DATOS].BI_dimension_tiempo(id_tiempo)
+    puntaje decimal(18,2),
+    PRIMARY KEY (rango_etario_agente, tiempo)
 );
 GO
 
 -- ========================================================================================
--- 8. PROCEDIMIENTOS DE MIGRACIÓN
+-- 4. PROCEDIMIENTOS DE MIGRACIÓN
 -- ========================================================================================
 
 -- Stored Procedure principal que poblará las tablas maestras de dimensiones estáticas e inferidas (catálogos)
@@ -380,7 +314,7 @@ END
 GO
 
 -- ========================================================================================
--- 9. EJECUCIÓN DE PROCEDIMIENTOS DE MIGRACIÓN
+-- 5. EJECUCIÓN DE PROCEDIMIENTOS DE MIGRACIÓN
 -- ========================================================================================
 -- Se ejecutan en orden lógico: las dimensiones primero y luego las tablas de hechos que las consumen.
 EXEC [BASADOS_DE_DATOS].sp_migrar_dimensiones_bi;
@@ -388,7 +322,7 @@ EXEC [BASADOS_DE_DATOS].sp_migrar_hechos_bi;
 GO
 
 -- ========================================================================================
--- 10. CREACIÓN DE VISTAS (TABLEROS DE CONTROL)
+-- 6. CREACIÓN DE VISTAS (TABLEROS DE CONTROL)
 -- ========================================================================================
 
 -- Vista 1. Ticket promedio: Valor promedio de venta mensual según rango etario de cliente y canal de venta.
