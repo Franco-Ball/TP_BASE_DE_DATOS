@@ -99,26 +99,32 @@ GO
 -- ========================================================================================
 
 -- Hecho Venta: Registra los importes totales de las ventas asociándolas al tiempo, cliente, canal y servicio.
+-- El grano es una fila por venta; 'venta' es una dimensión degenerada (código operativo) que actúa de PK.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_venta(
+    venta bigint,
     rango_etario_cliente bigint,
     canal_de_venta bigint,
     tiempo bigint,
     tipo_servicio bigint,
     importe_total decimal(18,2),
-    PRIMARY KEY (rango_etario_cliente, canal_de_venta, tiempo, tipo_servicio)
+    PRIMARY KEY (venta)
 );
 
 -- Hecho Solicitud: Contabiliza los días de anticipación de una solicitud según la temporada y la edad del cliente.
+-- El grano es una fila por solicitud; 'solicitud' es la dimensión degenerada que actúa de PK.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_solicitud(
+    solicitud bigint,
     tiempo bigint,
     temporada bigint,
     rango_etario_cliente bigint,
     dias_anticipacion int,
-    PRIMARY KEY (tiempo, temporada, rango_etario_cliente)
+    PRIMARY KEY (solicitud)
 );
 
 -- Hecho Propuesta: Permite analizar la eficacia (tiempos de respuesta, desvíos monetarios) del trabajo de los agentes y los importes de propuestas.
+-- El grano es una fila por propuesta; 'propuesta' es la dimensión degenerada que actúa de PK.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_propuesta(
+    propuesta bigint,
     estado_propuesta bigint,
     temporada_inicio_viaje bigint,
     tiempo_emision_propuesta bigint,
@@ -128,23 +134,27 @@ CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_propuesta(
     dias_entre_solicitud_y_propuesta int,
     importe_total decimal(18,2),
     desvio_presupuesto_importe decimal(18,2),
-    PRIMARY KEY (estado_propuesta, temporada_inicio_viaje, tiempo_emision_propuesta, tiempo_inicio_viaje, tiempo_fecha_solicitud, rango_etario_agente)
+    PRIMARY KEY (propuesta)
 );
 
 -- Hecho Aspecto: Almacena el puntaje directo de cada pregunta individual dentro de una encuesta.
+-- El grano es una fila por (encuesta, aspecto); 'encuesta' es la dimensión degenerada que junto al aspecto forma la PK.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_aspecto(
+    encuesta bigint,
     tiempo bigint,
     detalle_aspecto bigint,
     puntaje int,
-    PRIMARY KEY (tiempo, detalle_aspecto)
+    PRIMARY KEY (encuesta, detalle_aspecto)
 );
 
 -- Hecho Encuesta: Mide la satisfacción general (promediada) de cada atención brindada por un agente en un momento del tiempo.
+-- El grano es una fila por encuesta; 'encuesta' es la dimensión degenerada que actúa de PK.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_encuesta(
+    encuesta bigint,
     rango_etario_agente bigint,
     tiempo bigint,
     puntaje decimal(18,2),
-    PRIMARY KEY (rango_etario_agente, tiempo)
+    PRIMARY KEY (encuesta)
 );
 GO
 
@@ -235,8 +245,9 @@ CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_hechos_bi
 AS
 BEGIN
     -- Migración de la tabla Hechos de Venta: Determina el tipo de servicio mediante un LEFT JOIN contra las ventas originadas en propuestas
-    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_venta (rango_etario_cliente, canal_de_venta, tiempo, tipo_servicio, importe_total)
-    SELECT 
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_venta (venta, rango_etario_cliente, canal_de_venta, tiempo, tipo_servicio, importe_total)
+    SELECT
+        v.vent_codigo,
         rc.id_rango_etario_cliente,
         cv.id_canal_de_venta,
         t.id_tiempo,
@@ -248,12 +259,12 @@ BEGIN
     JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON YEAR(v.vent_fecha) = t.anyo AND MONTH(v.vent_fecha) = t.mes
     JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON rc.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(c.clie_fecha_nacimiento, v.vent_fecha))
     JOIN [BASADOS_DE_DATOS].BI_dimension_canal_de_venta cv ON cv.canal = canal.cana_nombre
-    LEFT JOIN [BASADOS_DE_DATOS].Venta_Propuesta vp ON vp.vpro_venta = v.vent_codigo
-    JOIN [BASADOS_DE_DATOS].BI_dimension_tipo_servicio ts ON ts.tipo = CASE WHEN vp.vpro_propuesta IS NULL THEN 'Venta Directa' ELSE 'Propuesta a Medida' END;
+    JOIN [BASADOS_DE_DATOS].BI_dimension_tipo_servicio ts ON ts.tipo = CASE WHEN EXISTS (SELECT 1 FROM [BASADOS_DE_DATOS].Venta_Propuesta vp WHERE vp.vpro_venta = v.vent_codigo) THEN 'Propuesta a Medida' ELSE 'Venta Directa' END;
 
     -- Migración de la tabla Hechos de Solicitud: Calcula matemáticamente los días de anticipación de una solicitud respecto al inicio previsto
-    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_solicitud (tiempo, temporada, rango_etario_cliente, dias_anticipacion)
-    SELECT 
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_solicitud (solicitud, tiempo, temporada, rango_etario_cliente, dias_anticipacion)
+    SELECT
+        s.soli_numero,
         t.id_tiempo,
         temp.id_temporada,
         rc.id_rango_etario_cliente,
@@ -265,8 +276,9 @@ BEGIN
     JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON rc.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(c.clie_fecha_nacimiento, s.soli_fecha));
 
     -- Migración de la tabla Hechos de Propuestas: Resuelve los cruces temporales, el tiempo de respuesta del agente y el desvío monetario
-    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_propuesta (estado_propuesta, temporada_inicio_viaje, tiempo_emision_propuesta, tiempo_inicio_viaje, tiempo_fecha_solicitud, rango_etario_agente, dias_entre_solicitud_y_propuesta, importe_total, desvio_presupuesto_importe)
-    SELECT 
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_propuesta (propuesta, estado_propuesta, temporada_inicio_viaje, tiempo_emision_propuesta, tiempo_inicio_viaje, tiempo_fecha_solicitud, rango_etario_agente, dias_entre_solicitud_y_propuesta, importe_total, desvio_presupuesto_importe)
+    SELECT
+        p.prop_codigo,
         ep.id_estado_propuesta,
         temp.id_temporada,
         t_emi.id_tiempo,
@@ -288,8 +300,9 @@ BEGIN
     JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente ra ON ra.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(a.agen_fecha_nacimiento, p.prop_fecha_emision));
 
     -- Migración de la tabla Hechos Aspecto: Desdobla las respuestas individuales de las encuestas
-    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_aspecto (tiempo, detalle_aspecto, puntaje)
-    SELECT 
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_aspecto (encuesta, tiempo, detalle_aspecto, puntaje)
+    SELECT
+        e.encu_codigo,
         t.id_tiempo,
         da.id_detalle_aspecto,
         a.aspe_puntaje
@@ -299,8 +312,9 @@ BEGIN
     JOIN [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto da ON da.detalle = a.aspe_detalle;
 
     -- Migración de la tabla Hechos de Encuestas (Satisfacción Promedio): Genera una sola fila por encuesta con la media de sus preguntas
-    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_encuesta (rango_etario_agente, tiempo, puntaje)
-    SELECT 
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_encuesta (encuesta, rango_etario_agente, tiempo, puntaje)
+    SELECT
+        e.encu_codigo,
         ra.id_rango_etario_agente,
         t.id_tiempo,
         AVG(CAST(asp.aspe_puntaje AS DECIMAL(18,2))) as puntaje_promedio
