@@ -1,28 +1,39 @@
 USE GD1C2026
 go
+-- Crea el esquema '[BASADOS_DE_DATOS]' para aislar los objetos de base de datos del grupo
 CREATE SCHEMA [BASADOS_DE_DATOS]
 GO
 
+
+-- Crea la tabla relacional 'Pais' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Pais (
     pais_codigo bigint IDENTITY(1,1) not null primary key,
     pais_nombre NVARCHAR(255) 
 );
 
+
+-- Crea la tabla relacional 'CanalVenta' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].CanalVenta (
     cana_codigo bigint IDENTITY(1,1) not null primary key,
     cana_nombre NVARCHAR(255)
 );
 
+
+-- Crea la tabla relacional 'MedioPago' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].MedioPago (
     medi_codigo bigint IDENTITY(1,1) not null primary key,
     medi_nombre NVARCHAR(255) 
 );
 
+
+-- Crea la tabla relacional 'Alianza' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Alianza (
     alia_codigo bigint IDENTITY(1,1) not null primary key,
     alia_nombre NVARCHAR(255) 
 );
 
+
+-- Crea la tabla relacional 'Proveedor' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Proveedor (
     prov_codigo  bigint IDENTITY(1,1) not null primary key,
     prov_nombre NVARCHAR(255),
@@ -30,17 +41,23 @@ CREATE TABLE [BASADOS_DE_DATOS].Proveedor (
     prov_telefono NVARCHAR(255)
 );
 
+
+-- Crea la tabla relacional 'EstadoPropuesta' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].EstadoPropuesta (
     esta_codigo bigint IDENTITY(1,1) not null primary key,
     esta_nombre NVARCHAR(255) 
 )
 
 
+
+-- Crea la tabla relacional 'Provincia' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Provincia (
     prov_codigo bigint IDENTITY(1,1) not null primary key,
     prov_nombre NVARCHAR(255),
 );
 
+
+-- Crea la tabla relacional 'Ciudad' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Ciudad (
     ciud_codigo bigint IDENTITY(1,1) not null primary key,
     ciud_nombre NVARCHAR(255),
@@ -48,6 +65,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Ciudad (
     FOREIGN KEY (ciud_pais) REFERENCES [BASADOS_DE_DATOS].Pais(pais_codigo)
 );
 
+
+-- Crea la tabla relacional 'Aerolinea' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Aerolinea (
     aero_codigo NVARCHAR(255) PRIMARY KEY,
     aero_nombre NVARCHAR(255),
@@ -59,6 +78,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Aerolinea (
 
 
 
+
+-- Crea la tabla relacional 'Localidad' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Localidad (
     loca_codigo bigint IDENTITY(1,1) not null primary key,
     loca_nombre NVARCHAR(255),
@@ -66,6 +87,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Localidad (
     FOREIGN KEY (loca_provincia) REFERENCES [BASADOS_DE_DATOS].Provincia(prov_codigo)
 );
 
+
+-- Crea la tabla relacional 'Aeropuerto' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Aeropuerto (
     aero_codigo NVARCHAR(10) PRIMARY KEY,
     aero_descripcion NVARCHAR(200),
@@ -73,6 +96,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Aeropuerto (
     FOREIGN KEY (aero_ciudad) REFERENCES [BASADOS_DE_DATOS].Ciudad(ciud_codigo)
 );
 
+
+-- Crea la tabla relacional 'Hospedaje' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Hospedaje (
     hosp_codigo bigint IDENTITY(1,1) not null primary key,
     hosp_ciudad bigint,
@@ -84,6 +109,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Hospedaje (
     FOREIGN KEY (hosp_ciudad) REFERENCES [BASADOS_DE_DATOS].Ciudad(ciud_codigo)
 );
 
+
+-- Crea la tabla relacional 'Excursion' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Excursion (
     excu_codigo BIGINT IDENTITY(1,1) not null PRIMARY KEY,
     excu_nombre NVARCHAR(255),
@@ -96,6 +123,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Excursion (
 );
 
 
+
+-- Crea la tabla relacional 'Agencia' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Agencia (
     agen_numero BIGINT primary key,
     agen_direccion NVARCHAR(255),
@@ -105,6 +134,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Agencia (
     FOREIGN KEY (agen_localidad) REFERENCES [BASADOS_DE_DATOS].Localidad(loca_codigo)
 );
 
+
+-- Crea la tabla relacional 'HabitacionHospedaje' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].HabitacionHospedaje (
     habi_codigo_habitacion BIGINT IDENTITY(1,1) not null PRIMARY KEY,
     habi_hospedaje BIGINT,
@@ -114,6 +145,8 @@ CREATE TABLE [BASADOS_DE_DATOS].HabitacionHospedaje (
     FOREIGN KEY (habi_hospedaje) REFERENCES [BASADOS_DE_DATOS].Hospedaje(hosp_codigo)
 );
 
+
+-- Crea la tabla relacional 'Vuelo' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Vuelo (
     vuel_codigo BIGINT identity(1,1) not null PRIMARY KEY,
     vuel_precio DECIMAL(18,2),
@@ -132,6 +165,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Vuelo (
 );
 
 
+
+-- Crea la tabla relacional 'Agente' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Agente (
     agen_legajo BIGINT PRIMARY KEY,
     agen_agencia BIGINT,
@@ -147,6 +182,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Agente (
     FOREIGN KEY (agen_localidad) REFERENCES [BASADOS_DE_DATOS].Localidad(loca_codigo)
 );
 
+
+-- Crea la tabla relacional 'Cliente' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Cliente (
     clie_codigo bigint identity(1,1) not null primary key,
     clie_dni NVARCHAR(255),
@@ -161,6 +198,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Cliente (
 );
 
 
+
+-- Crea la tabla relacional 'Solicitud' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Solicitud (
     soli_numero BIGINT PRIMARY KEY,
     soli_cliente bigint,
@@ -175,6 +214,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Solicitud (
     FOREIGN KEY (soli_agente) REFERENCES [BASADOS_DE_DATOS].Agente(agen_legajo)
 );
 
+
+-- Crea la tabla relacional 'Venta' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Venta (
     vent_codigo BIGINT PRIMARY KEY,
     vent_cliente bigint,
@@ -191,6 +232,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Venta (
     FOREIGN KEY (vent_medio_pago) REFERENCES [BASADOS_DE_DATOS].MedioPago(medi_codigo)
 );
 
+
+-- Crea la tabla relacional 'Encuesta' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Encuesta (
     encu_codigo BIGINT PRIMARY KEY,
     encu_fecha DATE,
@@ -202,6 +245,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Encuesta (
 );
 
 
+
+-- Crea la tabla relacional 'CiudadSolicitud' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].CiudadSolicitud (
     ciud_numero BIGINT,
     ciud_detalle NVARCHAR(255),
@@ -210,6 +255,8 @@ CREATE TABLE [BASADOS_DE_DATOS].CiudadSolicitud (
     FOREIGN KEY (ciud_numero) REFERENCES [BASADOS_DE_DATOS].Solicitud(soli_numero)
 );
 
+
+-- Crea la tabla relacional 'Propuesta' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Propuesta (
     prop_codigo BIGINT PRIMARY KEY,
     prop_solicitud BIGINT,
@@ -227,6 +274,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Propuesta (
     FOREIGN KEY (prop_estado) REFERENCES [BASADOS_DE_DATOS].EstadoPropuesta(esta_codigo)
 );
 
+
+-- Crea la tabla relacional 'Aspecto' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Aspecto (
     aspe_encuesta BIGINT,
     aspe_detalle NVARCHAR(255),
@@ -235,6 +284,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Aspecto (
 );
 
 
+
+-- Crea la tabla relacional 'Venta_Propuesta' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].Venta_Propuesta (
     vpro_venta BIGINT,
     vpro_propuesta BIGINT,
@@ -242,6 +293,8 @@ CREATE TABLE [BASADOS_DE_DATOS].Venta_Propuesta (
     FOREIGN KEY (vpro_propuesta) REFERENCES [BASADOS_DE_DATOS].Propuesta(prop_codigo)
 );
 
+
+-- Crea la tabla relacional 'ItemVentaVuelo' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].ItemVentaVuelo (
     item_venta BIGINT,
     item_vuelo BIGINT,
@@ -253,6 +306,8 @@ CREATE TABLE [BASADOS_DE_DATOS].ItemVentaVuelo (
     FOREIGN KEY (item_vuelo) REFERENCES [BASADOS_DE_DATOS].Vuelo(vuel_codigo)
 );
 
+
+-- Crea la tabla relacional 'ItemVentaHospedaje' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].ItemVentaHospedaje (
     item_venta BIGINT,
     item_hospedaje BIGINT,
@@ -268,6 +323,8 @@ CREATE TABLE [BASADOS_DE_DATOS].ItemVentaHospedaje (
     FOREIGN KEY (item_habitacion) REFERENCES [BASADOS_DE_DATOS].HabitacionHospedaje(habi_codigo_habitacion)
 );
 
+
+-- Crea la tabla relacional 'ItemVentaExcursion' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].ItemVentaExcursion (
     item_venta BIGINT,
     item_excursion BIGINT,
@@ -280,6 +337,8 @@ CREATE TABLE [BASADOS_DE_DATOS].ItemVentaExcursion (
     FOREIGN KEY (item_excursion) REFERENCES [BASADOS_DE_DATOS].Excursion(excu_codigo)
 );
 
+
+-- Crea la tabla relacional 'ItemPropuestaVuelo' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].ItemPropuestaVuelo (
     item_propuesta BIGINT,
     item_vuelo BIGINT,
@@ -290,6 +349,8 @@ CREATE TABLE [BASADOS_DE_DATOS].ItemPropuestaVuelo (
     FOREIGN KEY (item_vuelo) REFERENCES [BASADOS_DE_DATOS].Vuelo(vuel_codigo)
 );
 
+
+-- Crea la tabla relacional 'ItemPropuestaHospedaje' para almacenar los registros de la entidad correspondientes
 CREATE TABLE [BASADOS_DE_DATOS].ItemPropuestaHospedaje (
     item_propuesta BIGINT,
     item_hospedaje BIGINT,
@@ -313,37 +374,67 @@ go
    =========================================================================== */
 
 -- Indices sobre claves naturales usadas en los JOIN de la migracion
+-- Crea el índice no agrupado 'IX_Pais_nombre' en la tabla 'Pais' sobre el campo 'pais_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Pais_nombre              ON [BASADOS_DE_DATOS].Pais(pais_nombre);
+-- Crea el índice no agrupado 'IX_Provincia_nombre' en la tabla 'Provincia' sobre el campo 'prov_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Provincia_nombre         ON [BASADOS_DE_DATOS].Provincia(prov_nombre);
+-- Crea el índice no agrupado 'IX_Localidad_nombre' en la tabla 'Localidad' sobre el campo 'loca_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Localidad_nombre         ON [BASADOS_DE_DATOS].Localidad(loca_nombre);
+-- Crea el índice no agrupado 'IX_Ciudad_nombre' en la tabla 'Ciudad' sobre el campo 'ciud_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Ciudad_nombre            ON [BASADOS_DE_DATOS].Ciudad(ciud_nombre);
+-- Crea el índice no agrupado 'IX_Alianza_nombre' en la tabla 'Alianza' sobre el campo 'alia_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Alianza_nombre           ON [BASADOS_DE_DATOS].Alianza(alia_nombre);
+-- Crea el índice no agrupado 'IX_CanalVenta_nombre' en la tabla 'CanalVenta' sobre el campo 'cana_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_CanalVenta_nombre        ON [BASADOS_DE_DATOS].CanalVenta(cana_nombre);
+-- Crea el índice no agrupado 'IX_MedioPago_nombre' en la tabla 'MedioPago' sobre el campo 'medi_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_MedioPago_nombre         ON [BASADOS_DE_DATOS].MedioPago(medi_nombre);
+-- Crea el índice no agrupado 'IX_EstadoPropuesta_nombre' en la tabla 'EstadoPropuesta' sobre el campo 'esta_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_EstadoPropuesta_nombre   ON [BASADOS_DE_DATOS].EstadoPropuesta(esta_nombre);
+-- Crea el índice no agrupado 'IX_Proveedor_nombre' en la tabla 'Proveedor' sobre el campo 'prov_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Proveedor_nombre         ON [BASADOS_DE_DATOS].Proveedor(prov_nombre);
+-- Crea el índice no agrupado 'IX_Hospedaje_natural' en la tabla 'Hospedaje' sobre el campo 'hosp_direccion, hosp_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Hospedaje_natural        ON [BASADOS_DE_DATOS].Hospedaje(hosp_direccion, hosp_nombre);
+-- Crea el índice no agrupado 'IX_Habitacion_natural' en la tabla 'HabitacionHospedaje' sobre el campo 'habi_hospedaje, habi_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Habitacion_natural       ON [BASADOS_DE_DATOS].HabitacionHospedaje(habi_hospedaje, habi_nombre);
+-- Crea el índice no agrupado 'IX_Vuelo_natural' en la tabla 'Vuelo' sobre el campo 'vuel_aeropuerto_salida, vuel_aeropuerto_llegada, vuel_aerolinea' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Vuelo_natural            ON [BASADOS_DE_DATOS].Vuelo(vuel_aeropuerto_salida, vuel_aeropuerto_llegada, vuel_aerolinea);
+-- Crea el índice no agrupado 'IX_Excursion_nombre' en la tabla 'Excursion' sobre el campo 'excu_nombre' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Excursion_nombre         ON [BASADOS_DE_DATOS].Excursion(excu_nombre);
+-- Crea el índice no agrupado 'IX_Cliente_natural' en la tabla 'Cliente' sobre el campo 'clie_dni, clie_nombre, clie_apellido, clie_direccion' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Cliente_natural          ON [BASADOS_DE_DATOS].Cliente(clie_dni, clie_nombre, clie_apellido, clie_direccion);
 
 -- Indices sobre claves foraneas de las tablas transaccionales y de detalle
+-- Crea el índice no agrupado 'IX_Venta_cliente' en la tabla 'Venta' sobre el campo 'vent_cliente' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Venta_cliente            ON [BASADOS_DE_DATOS].Venta(vent_cliente);
+-- Crea el índice no agrupado 'IX_Venta_agente' en la tabla 'Venta' sobre el campo 'vent_agente' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Venta_agente             ON [BASADOS_DE_DATOS].Venta(vent_agente);
+-- Crea el índice no agrupado 'IX_Venta_canal' en la tabla 'Venta' sobre el campo 'vent_canal_venta' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Venta_canal              ON [BASADOS_DE_DATOS].Venta(vent_canal_venta);
+-- Crea el índice no agrupado 'IX_Solicitud_cliente' en la tabla 'Solicitud' sobre el campo 'soli_cliente' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Solicitud_cliente        ON [BASADOS_DE_DATOS].Solicitud(soli_cliente);
+-- Crea el índice no agrupado 'IX_Solicitud_agente' en la tabla 'Solicitud' sobre el campo 'soli_agente' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Solicitud_agente         ON [BASADOS_DE_DATOS].Solicitud(soli_agente);
+-- Crea el índice no agrupado 'IX_Propuesta_solicitud' en la tabla 'Propuesta' sobre el campo 'prop_solicitud' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Propuesta_solicitud      ON [BASADOS_DE_DATOS].Propuesta(prop_solicitud);
+-- Crea el índice no agrupado 'IX_Propuesta_agente' en la tabla 'Propuesta' sobre el campo 'prop_agente' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Propuesta_agente         ON [BASADOS_DE_DATOS].Propuesta(prop_agente);
+-- Crea el índice no agrupado 'IX_Propuesta_estado' en la tabla 'Propuesta' sobre el campo 'prop_estado' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Propuesta_estado         ON [BASADOS_DE_DATOS].Propuesta(prop_estado);
+-- Crea el índice no agrupado 'IX_Encuesta_agente' en la tabla 'Encuesta' sobre el campo 'encu_agente' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Encuesta_agente          ON [BASADOS_DE_DATOS].Encuesta(encu_agente);
+-- Crea el índice no agrupado 'IX_Aspecto_encuesta' en la tabla 'Aspecto' sobre el campo 'aspe_encuesta' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_Aspecto_encuesta         ON [BASADOS_DE_DATOS].Aspecto(aspe_encuesta);
+-- Crea el índice no agrupado 'IX_VentaPropuesta_venta' en la tabla 'Venta_Propuesta' sobre el campo 'vpro_venta' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_VentaPropuesta_venta     ON [BASADOS_DE_DATOS].Venta_Propuesta(vpro_venta);
+-- Crea el índice no agrupado 'IX_ItemVentaVuelo_venta' en la tabla 'ItemVentaVuelo' sobre el campo 'item_venta' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_ItemVentaVuelo_venta     ON [BASADOS_DE_DATOS].ItemVentaVuelo(item_venta);
+-- Crea el índice no agrupado 'IX_ItemVentaHosp_venta' en la tabla 'ItemVentaHospedaje' sobre el campo 'item_venta' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_ItemVentaHosp_venta      ON [BASADOS_DE_DATOS].ItemVentaHospedaje(item_venta);
+-- Crea el índice no agrupado 'IX_ItemVentaExc_venta' en la tabla 'ItemVentaExcursion' sobre el campo 'item_venta' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_ItemVentaExc_venta       ON [BASADOS_DE_DATOS].ItemVentaExcursion(item_venta);
+-- Crea el índice no agrupado 'IX_ItemPropVuelo_propuesta' en la tabla 'ItemPropuestaVuelo' sobre el campo 'item_propuesta' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_ItemPropVuelo_propuesta  ON [BASADOS_DE_DATOS].ItemPropuestaVuelo(item_propuesta);
+-- Crea el índice no agrupado 'IX_ItemPropHosp_propuesta' en la tabla 'ItemPropuestaHospedaje' sobre el campo 'item_propuesta' para optimizar el rendimiento de las consultas y JOINs
 CREATE INDEX IX_ItemPropHosp_propuesta   ON [BASADOS_DE_DATOS].ItemPropuestaHospedaje(item_propuesta);
 GO
 
@@ -354,6 +445,8 @@ GO
    =========================================================================== */
 
 -- Migra Pais: unifica los nombres de pais de aeropuertos, aerolineas y hospedajes
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Pais AS
 BEGIN
     WITH PaisesUnificados AS (
@@ -379,6 +472,8 @@ END
 GO
 
 -- Migra CanalVenta
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_CanalVenta AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].CanalVenta (cana_nombre)
@@ -388,6 +483,8 @@ END
 GO
 
 -- Migra MedioPago
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra 
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_MedioPago AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].MedioPago (medi_nombre)
@@ -397,6 +494,8 @@ END
 GO
 
 -- Migra Alianza
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra 
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Alianza AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Alianza (alia_nombre)
@@ -406,6 +505,8 @@ END
 GO
 
 -- Migra EstadoPropuesta
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra 
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_EstadoPropuesta AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].EstadoPropuesta (esta_nombre)
@@ -415,6 +516,8 @@ END
 GO
 
 -- Migra Ciudad: relaciona cada ciudad con su pais
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Ciudad AS
 BEGIN
     WITH Ciudad_Pais AS (
@@ -435,6 +538,8 @@ END
 GO
 
 -- Migra Proveedor
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra 
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Proveedor AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Proveedor
@@ -444,6 +549,8 @@ END
 GO
 
 -- Migra Provincia: unifica las provincias de agencias, agentes y clientes
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra 
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Provincia AS
 BEGIN
     WITH ProvinciasUnificadas AS (
@@ -465,6 +572,8 @@ END
 GO
 
 -- Migra Localidad: relaciona cada localidad con su provincia
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Localidad AS
 BEGIN
     WITH Provincia_Localidad AS (
@@ -484,6 +593,8 @@ END
 GO
 
 -- Migra Aerolinea
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Aerolinea AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Aerolinea
@@ -495,6 +606,8 @@ END
 GO
 
 -- Migra Aeropuerto: unifica aeropuertos de salida y llegada
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra hacia
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Aeropuerto AS
 BEGIN
     WITH AeropuertosUnificados AS (
@@ -521,6 +634,8 @@ END
 GO
 
 -- Migra Hospedaje
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Hospedaje AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Hospedaje(
@@ -540,6 +655,8 @@ END
 GO
 
 -- Migra Excursion
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra'
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Excursion AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Excursion(
@@ -557,6 +674,8 @@ END
 GO
 
 -- Migra Agencia
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Agencia AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Agencia
@@ -568,6 +687,8 @@ END
 GO
 
 -- Migra HabitacionHospedaje
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_HabitacionHospedaje AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].HabitacionHospedaje
@@ -590,6 +711,8 @@ END
 GO
 
 -- Migra Vuelo
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Vuelo AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Vuelo(
@@ -613,6 +736,8 @@ END
 GO
 
 -- Migra Agente
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Agente AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Agente
@@ -635,6 +760,8 @@ END
 GO
 
 -- Migra Cliente
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Cliente AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Cliente(
@@ -656,6 +783,8 @@ END
 GO
 
 -- Migra Solicitud
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Solicitud AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Solicitud(
@@ -682,6 +811,8 @@ END
 GO
 
 -- Migra Venta
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Venta AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Venta(
@@ -710,6 +841,8 @@ END
 GO
 
 -- Migra Encuesta
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Encuesta AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Encuesta
@@ -724,6 +857,8 @@ END
 GO
 
 -- Migra CiudadSolicitud
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_CiudadSolicitud AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].CiudadSolicitud
@@ -734,6 +869,8 @@ END
 GO
 
 -- Migra Propuesta
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Propuesta AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Propuesta(
@@ -760,6 +897,8 @@ END
 GO
 
 -- Migra Aspecto
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Aspecto AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Aspecto
@@ -770,6 +909,8 @@ END
 GO
 
 -- Migra Venta_Propuesta (relacion venta <-> propuesta)
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_Venta_Propuesta AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].Venta_Propuesta
@@ -780,6 +921,8 @@ END
 GO
 
 -- Migra ItemVentaVuelo
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_ItemVentaVuelo AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].ItemVentaVuelo(
@@ -804,6 +947,8 @@ END
 GO
 
 -- Migra ItemVentaHospedaje
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_ItemVentaHospedaje AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].ItemVentaHospedaje(
@@ -834,6 +979,8 @@ END
 GO
 
 -- Migra ItemVentaExcursion
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_ItemVentaExcursion AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].ItemVentaExcursion(
@@ -857,6 +1004,8 @@ END
 GO
 
 -- Migra ItemPropuestaVuelo
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_ItemPropuestaVuelo AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].ItemPropuestaVuelo
@@ -873,6 +1022,8 @@ END
 GO
 
 -- Migra ItemPropuestaHospedaje
+
+-- Procedimiento almacenado para la migración e inserción de datos desde la tabla maestra
 CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_ItemPropuestaHospedaje AS
 BEGIN
     INSERT INTO [BASADOS_DE_DATOS].ItemPropuestaHospedaje(
@@ -908,34 +1059,64 @@ GO
    luego transaccionales, y por ultimo las tablas de detalle/cruce).
    =========================================================================== */
 
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Pais' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Pais;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_CanalVenta' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_CanalVenta;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_MedioPago' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_MedioPago;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Alianza' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Alianza;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_EstadoPropuesta' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_EstadoPropuesta;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Ciudad' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Ciudad;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Proveedor' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Proveedor;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Provincia' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Provincia;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Localidad' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Localidad;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Aerolinea' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Aerolinea;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Aeropuerto' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Aeropuerto;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Hospedaje' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Hospedaje;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Excursion' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Excursion;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Agencia' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Agencia;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_HabitacionHospedaje' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_HabitacionHospedaje;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Vuelo' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Vuelo;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Agente' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Agente;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Cliente' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Cliente;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Solicitud' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Solicitud;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Venta' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Venta;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Encuesta' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Encuesta;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_CiudadSolicitud' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_CiudadSolicitud;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Propuesta' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Propuesta;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Aspecto' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Aspecto;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_Venta_Propuesta' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_Venta_Propuesta;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_ItemVentaVuelo' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_ItemVentaVuelo;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_ItemVentaHospedaje' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_ItemVentaHospedaje;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_ItemVentaExcursion' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_ItemVentaExcursion;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_ItemPropuestaVuelo' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_ItemPropuestaVuelo;
+-- Ejecuta el procedimiento almacenado 'sp_migrar_ItemPropuestaHospedaje' para migrar y poblar la tabla relacional correspondiente
 EXEC [BASADOS_DE_DATOS].sp_migrar_ItemPropuestaHospedaje;
 GO
