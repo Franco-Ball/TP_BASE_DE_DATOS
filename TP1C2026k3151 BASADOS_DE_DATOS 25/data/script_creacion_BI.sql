@@ -99,62 +99,57 @@ GO
 -- ========================================================================================
 
 -- Hecho Venta: Registra los importes totales de las ventas asociándolas al tiempo, cliente, canal y servicio.
--- El grano es una fila por venta; 'venta' es una dimensión degenerada (código operativo) que actúa de PK.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_venta(
-    venta bigint,
     rango_etario_cliente bigint,
     canal_de_venta bigint,
     tiempo bigint,
     tipo_servicio bigint,
     importe_total decimal(18,2),
-    PRIMARY KEY (venta)
+    cantidad_ventas int,
+    PRIMARY KEY (rango_etario_cliente, canal_de_venta, tiempo, tipo_servicio)
 );
 
 -- Hecho Solicitud: Contabiliza los días de anticipación de una solicitud según la temporada y la edad del cliente.
--- El grano es una fila por solicitud; 'solicitud' es la dimensión degenerada que actúa de PK.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_solicitud(
-    solicitud bigint,
     tiempo bigint,
     temporada bigint,
     rango_etario_cliente bigint,
-    dias_anticipacion int,
-    PRIMARY KEY (solicitud)
+    total_dias_anticipacion int,
+    cantidad_solicitudes int,
+    PRIMARY KEY (tiempo, temporada, rango_etario_cliente)
 );
 
 -- Hecho Propuesta: Permite analizar la eficacia (tiempos de respuesta, desvíos monetarios) del trabajo de los agentes y los importes de propuestas.
--- El grano es una fila por propuesta; 'propuesta' es la dimensión degenerada que actúa de PK.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_propuesta(
-    propuesta bigint,
     estado_propuesta bigint,
     temporada_inicio_viaje bigint,
     tiempo_emision_propuesta bigint,
     tiempo_inicio_viaje bigint,
     tiempo_fecha_solicitud bigint,
     rango_etario_agente bigint,
-    dias_entre_solicitud_y_propuesta int,
+    total_dias_entre_solicitud_y_propuesta int,
     importe_total decimal(18,2),
-    desvio_presupuesto_importe decimal(18,2),
-    PRIMARY KEY (propuesta)
+    total_desvio_presupuesto_importe decimal(18,2),
+    cantidad_propuestas int,
+    PRIMARY KEY (estado_propuesta, temporada_inicio_viaje, tiempo_emision_propuesta, tiempo_inicio_viaje, tiempo_fecha_solicitud, rango_etario_agente)
 );
 
 -- Hecho Aspecto: Almacena el puntaje directo de cada pregunta individual dentro de una encuesta.
--- El grano es una fila por (encuesta, aspecto); 'encuesta' es la dimensión degenerada que junto al aspecto forma la PK.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_aspecto(
-    encuesta bigint,
     tiempo bigint,
     detalle_aspecto bigint,
-    puntaje int,
-    PRIMARY KEY (encuesta, detalle_aspecto)
+    total_puntaje int,
+    cantidad_evaluaciones int,
+    PRIMARY KEY (tiempo, detalle_aspecto)
 );
 
 -- Hecho Encuesta: Mide la satisfacción general (promediada) de cada atención brindada por un agente en un momento del tiempo.
--- El grano es una fila por encuesta; 'encuesta' es la dimensión degenerada que actúa de PK.
 CREATE TABLE [BASADOS_DE_DATOS].BI_hecho_encuesta(
-    encuesta bigint,
     rango_etario_agente bigint,
     tiempo bigint,
-    puntaje decimal(18,2),
-    PRIMARY KEY (encuesta)
+    total_puntaje decimal(18,2),
+    cantidad_encuestas int,
+    PRIMARY KEY (rango_etario_agente, tiempo)
 );
 GO
 
@@ -245,49 +240,51 @@ CREATE PROCEDURE [BASADOS_DE_DATOS].sp_migrar_hechos_bi
 AS
 BEGIN
     -- Migración de la tabla Hechos de Venta: Determina el tipo de servicio mediante un LEFT JOIN contra las ventas originadas en propuestas
-    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_venta (venta, rango_etario_cliente, canal_de_venta, tiempo, tipo_servicio, importe_total)
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_venta (rango_etario_cliente, canal_de_venta, tiempo, tipo_servicio, importe_total, cantidad_ventas)
     SELECT
-        v.vent_codigo,
         rc.id_rango_etario_cliente,
         cv.id_canal_de_venta,
         t.id_tiempo,
         ts.id_tipo_servicio,
-        v.vent_importe_total
+        sum(v.vent_importe_total),
+        COUNT(*)
     FROM [BASADOS_DE_DATOS].Venta v
     JOIN [BASADOS_DE_DATOS].Cliente c ON v.vent_cliente = c.clie_codigo
     JOIN [BASADOS_DE_DATOS].CanalVenta canal ON v.vent_canal_venta = canal.cana_codigo
     JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON YEAR(v.vent_fecha) = t.anyo AND MONTH(v.vent_fecha) = t.mes
     JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON rc.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(c.clie_fecha_nacimiento, v.vent_fecha))
     JOIN [BASADOS_DE_DATOS].BI_dimension_canal_de_venta cv ON cv.canal = canal.cana_nombre
-    JOIN [BASADOS_DE_DATOS].BI_dimension_tipo_servicio ts ON ts.tipo = CASE WHEN EXISTS (SELECT 1 FROM [BASADOS_DE_DATOS].Venta_Propuesta vp WHERE vp.vpro_venta = v.vent_codigo) THEN 'Propuesta a Medida' ELSE 'Venta Directa' END;
+    JOIN [BASADOS_DE_DATOS].BI_dimension_tipo_servicio ts ON ts.tipo = CASE WHEN EXISTS (SELECT 1 FROM [BASADOS_DE_DATOS].Venta_Propuesta vp WHERE vp.vpro_venta = v.vent_codigo) THEN 'Propuesta a Medida' ELSE 'Venta Directa' END
+    GROUP BY rc.id_rango_etario_cliente, cv.id_canal_de_venta, t.id_tiempo, ts.id_tipo_servicio
 
     -- Migración de la tabla Hechos de Solicitud: Calcula matemáticamente los días de anticipación de una solicitud respecto al inicio previsto
-    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_solicitud (solicitud, tiempo, temporada, rango_etario_cliente, dias_anticipacion)
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_solicitud (tiempo, temporada, rango_etario_cliente, total_dias_anticipacion, cantidad_solicitudes)
     SELECT
-        s.soli_numero,
         t.id_tiempo,
         temp.id_temporada,
         rc.id_rango_etario_cliente,
-        DATEDIFF(DAY, s.soli_fecha, s.soli_inicio_tentativa) as dias_anticipacion
+        sum(DATEDIFF(DAY, s.soli_fecha, s.soli_inicio_tentativa)) as dias_anticipacion,
+        count(*)
     FROM [BASADOS_DE_DATOS].Solicitud s
     JOIN [BASADOS_DE_DATOS].Cliente c ON s.soli_cliente = c.clie_codigo
     JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON YEAR(s.soli_fecha) = t.anyo AND MONTH(s.soli_fecha) = t.mes
     JOIN [BASADOS_DE_DATOS].BI_dimension_temporada temp ON temp.temporada = [BASADOS_DE_DATOS].fn_temporada(s.soli_inicio_tentativa)
-    JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON rc.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(c.clie_fecha_nacimiento, s.soli_fecha));
+    JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON rc.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(c.clie_fecha_nacimiento, s.soli_fecha))
+    GROUP BY t.id_tiempo, temp.id_temporada, rc.id_rango_etario_cliente
 
     -- Migración de la tabla Hechos de Propuestas: Resuelve los cruces temporales, el tiempo de respuesta del agente y el desvío monetario
-    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_propuesta (propuesta, estado_propuesta, temporada_inicio_viaje, tiempo_emision_propuesta, tiempo_inicio_viaje, tiempo_fecha_solicitud, rango_etario_agente, dias_entre_solicitud_y_propuesta, importe_total, desvio_presupuesto_importe)
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_propuesta (estado_propuesta, temporada_inicio_viaje, tiempo_emision_propuesta, tiempo_inicio_viaje, tiempo_fecha_solicitud, rango_etario_agente, total_dias_entre_solicitud_y_propuesta, importe_total, total_desvio_presupuesto_importe, cantidad_propuestas)
     SELECT
-        p.prop_codigo,
         ep.id_estado_propuesta,
         temp.id_temporada,
         t_emi.id_tiempo,
         t_ini.id_tiempo,
         t_sol.id_tiempo,
         ra.id_rango_etario_agente,
-        DATEDIFF(DAY, s.soli_fecha, p.prop_fecha_emision),
-        p.prop_importe_total,
-        (p.prop_importe_total - s.soli_presupuesto_estimado) as desvio_presupuesto_importe
+        sum(DATEDIFF(DAY, s.soli_fecha, p.prop_fecha_emision)),
+        sum(p.prop_importe_total),
+        sum((p.prop_importe_total - s.soli_presupuesto_estimado)) as desvio_presupuesto_importe,
+        count(*)
     FROM [BASADOS_DE_DATOS].Propuesta p
     JOIN [BASADOS_DE_DATOS].Solicitud s ON p.prop_solicitud = s.soli_numero
     JOIN [BASADOS_DE_DATOS].EstadoPropuesta e ON p.prop_estado = e.esta_codigo
@@ -297,33 +294,38 @@ BEGIN
     JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_emi ON YEAR(p.prop_fecha_emision) = t_emi.anyo AND MONTH(p.prop_fecha_emision) = t_emi.mes
     JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_ini ON YEAR(p.prop_fecha_desde) = t_ini.anyo AND MONTH(p.prop_fecha_desde) = t_ini.mes
     JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_sol ON YEAR(s.soli_fecha) = t_sol.anyo AND MONTH(s.soli_fecha) = t_sol.mes
-    JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente ra ON ra.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(a.agen_fecha_nacimiento, p.prop_fecha_emision));
+    JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente ra ON ra.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(a.agen_fecha_nacimiento, p.prop_fecha_emision))
+    GROUP BY ep.id_estado_propuesta, temp.id_temporada, t_emi.id_tiempo, t_ini.id_tiempo, t_sol.id_tiempo, ra.id_rango_etario_agente
 
     -- Migración de la tabla Hechos Aspecto: Desdobla las respuestas individuales de las encuestas
-    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_aspecto (encuesta, tiempo, detalle_aspecto, puntaje)
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_aspecto (tiempo, detalle_aspecto, total_puntaje, cantidad_evaluaciones)
     SELECT
-        e.encu_codigo,
         t.id_tiempo,
         da.id_detalle_aspecto,
-        a.aspe_puntaje
+        sum(a.aspe_puntaje),
+        COUNT(*)
     FROM [BASADOS_DE_DATOS].Aspecto a
     JOIN [BASADOS_DE_DATOS].Encuesta e ON a.aspe_encuesta = e.encu_codigo
     JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON YEAR(e.encu_fecha) = t.anyo AND MONTH(e.encu_fecha) = t.mes
-    JOIN [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto da ON da.detalle = a.aspe_detalle;
-
+    JOIN [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto da ON da.detalle = a.aspe_detalle
+    GROUP BY t.id_tiempo, da.id_detalle_aspecto;
+      
     -- Migración de la tabla Hechos de Encuestas (Satisfacción Promedio): Genera una sola fila por encuesta con la media de sus preguntas
-    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_encuesta (encuesta, rango_etario_agente, tiempo, puntaje)
+    with Encuesta_Puntaje as (
+    select encu_codigo, encu_agente, encu_fecha, avg(aspe_puntaje * 1.0) as puntaje from [BASADOS_DE_DATOS].Aspecto join [BASADOS_DE_DATOS].Encuesta on encu_codigo = aspe_encuesta 
+    group by encu_codigo, encu_agente, encu_fecha
+    )
+    INSERT INTO [BASADOS_DE_DATOS].BI_hecho_encuesta (rango_etario_agente, tiempo, total_puntaje, cantidad_encuestas)
     SELECT
-        e.encu_codigo,
         ra.id_rango_etario_agente,
         t.id_tiempo,
-        AVG(CAST(asp.aspe_puntaje AS DECIMAL(18,2))) as puntaje_promedio
-    FROM [BASADOS_DE_DATOS].Encuesta e
-    JOIN [BASADOS_DE_DATOS].Aspecto asp ON e.encu_codigo = asp.aspe_encuesta
+        sum(e.puntaje) as puntaje_total,
+        count(*)
+    FROM Encuesta_Puntaje e
     JOIN [BASADOS_DE_DATOS].Agente ag ON e.encu_agente = ag.agen_legajo
     JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON YEAR(e.encu_fecha) = t.anyo AND MONTH(e.encu_fecha) = t.mes
     JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente ra ON ra.rango = [BASADOS_DE_DATOS].fn_rango_etario([BASADOS_DE_DATOS].fn_calcular_edad(ag.agen_fecha_nacimiento, e.encu_fecha))
-    GROUP BY ra.id_rango_etario_agente, t.id_tiempo, e.encu_codigo;
+    GROUP BY ra.id_rango_etario_agente, t.id_tiempo;
 END
 GO
 
@@ -347,7 +349,7 @@ SELECT
     t.mes as Mes,
     rc.rango as Rango_Etario_Cliente,
     cv.canal as Canal_Venta,
-    AVG(hv.importe_total) as Ticket_Promedio
+    SUM(hv.importe_total) / SUM(hv.cantidad_ventas) as Ticket_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_venta hv
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON hv.tiempo = t.id_tiempo
 JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON hv.rango_etario_cliente = rc.id_rango_etario_cliente
@@ -381,7 +383,7 @@ SELECT
     t.anyo as Anio,
     temp.temporada as Temporada,
     rc.rango as Rango_Etario_Cliente,
-    COUNT(*) as Cantidad_Solicitudes
+    SUM(hs.cantidad_solicitudes) as Cantidad_Solicitudes
 FROM [BASADOS_DE_DATOS].BI_hecho_solicitud hs
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON hs.tiempo = t.id_tiempo
 JOIN [BASADOS_DE_DATOS].BI_dimension_temporada temp ON hs.temporada = temp.id_temporada
@@ -395,7 +397,7 @@ SELECT
     t.anyo as Anio,
     t.cuatrimestre as Cuatrimestre,
     rc.rango as Rango_Etario_Cliente,
-    AVG(CAST(hs.dias_anticipacion as decimal(18,2))) as Anticipacion_Promedio_Dias
+    SUM(hs.total_dias_anticipacion) * 1.0 / SUM(hs.cantidad_solicitudes) as Anticipacion_Promedio_Dias
 FROM [BASADOS_DE_DATOS].BI_hecho_solicitud hs
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON hs.tiempo = t.id_tiempo
 JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_cliente rc ON hs.rango_etario_cliente = rc.id_rango_etario_cliente
@@ -408,7 +410,7 @@ CREATE VIEW [BASADOS_DE_DATOS].V_BI_Tasa_Aceptacion_Propuestas AS
 SELECT 
     t.anyo as Anio,
     t.cuatrimestre as Cuatrimestre,
-    CAST(SUM(CASE WHEN ep.estado LIKE '%ceptad%' THEN 1 ELSE 0 END) AS DECIMAL) * 100.0 / COUNT(*) as Tasa_Aceptacion_Porcentaje
+    CAST(SUM(CASE WHEN ep.estado LIKE '%ceptad%' THEN hp.cantidad_propuestas ELSE 0 END) AS DECIMAL) * 100.0 / nullif(SUM(hp.cantidad_propuestas), 0) as Tasa_Aceptacion_Porcentaje
 FROM [BASADOS_DE_DATOS].BI_hecho_propuesta hp
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON hp.tiempo_emision_propuesta = t.id_tiempo
 JOIN [BASADOS_DE_DATOS].BI_dimension_estado_propuesta ep ON hp.estado_propuesta = ep.id_estado_propuesta
@@ -420,7 +422,7 @@ CREATE VIEW [BASADOS_DE_DATOS].V_BI_Cotizacion_Promedio_Temporada AS
 SELECT 
     t_ini.anyo as Anio_Inicio_Viaje,
     temp.temporada as Temporada_Inicio_Viaje,
-    AVG(hp.importe_total) as Cotizacion_Promedio
+    SUM(hp.importe_total) / SUM(hp.cantidad_propuestas) as Cotizacion_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_propuesta hp
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_ini ON hp.tiempo_inicio_viaje = t_ini.id_tiempo
 JOIN [BASADOS_DE_DATOS].BI_dimension_temporada temp ON hp.temporada_inicio_viaje = temp.id_temporada
@@ -433,7 +435,7 @@ SELECT
     t_sol.anyo as Anio_Solicitud,
     t_sol.mes as Mes_Solicitud,
     ra.rango as Rango_Etario_Agente,
-    AVG(CAST(hp.dias_entre_solicitud_y_propuesta as decimal(18,2))) as Tiempo_Respuesta_Dias
+    SUM(hp.total_dias_entre_solicitud_y_propuesta) * 1.0 / SUM(hp.cantidad_propuestas) as Tiempo_Respuesta_Dias
 FROM [BASADOS_DE_DATOS].BI_hecho_propuesta hp
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_sol ON hp.tiempo_fecha_solicitud = t_sol.id_tiempo
 JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente ra ON hp.rango_etario_agente = ra.id_rango_etario_agente
@@ -445,7 +447,7 @@ CREATE VIEW [BASADOS_DE_DATOS].V_BI_Desvio_Presupuesto AS
 SELECT 
     t_emi.anyo as Anio_Emision,
     t_emi.mes as Mes_Emision,
-    AVG(hp.desvio_presupuesto_importe) as Desvio_Presupuesto_Promedio
+    SUM(hp.total_desvio_presupuesto_importe) / SUM(hp.cantidad_propuestas) as Desvio_Presupuesto_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_propuesta hp
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t_emi ON hp.tiempo_emision_propuesta = t_emi.id_tiempo
 GROUP BY t_emi.anyo, t_emi.mes;
@@ -458,7 +460,7 @@ SELECT TOP(100) PERCENT
     t.anyo as Anio,
     t.cuatrimestre as Cuatrimestre,
     da.detalle as Aspecto,
-    AVG(CAST(ha.puntaje as decimal(18,2))) as Puntaje_Promedio
+    SUM(ha.total_puntaje) * 1.0 / SUM(ha.cantidad_evaluaciones) as Puntaje_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_aspecto ha
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON ha.tiempo = t.id_tiempo
 JOIN [BASADOS_DE_DATOS].BI_dimension_detalle_aspecto da ON ha.detalle_aspecto = da.id_detalle_aspecto
@@ -472,7 +474,7 @@ SELECT
     t.anyo as Anio,
     t.mes as Mes,
     ra.rango as Rango_Etario_Agente,
-    AVG(he.puntaje) as Satisfaccion_Promedio
+    SUM(he.total_puntaje) / SUM(he.cantidad_encuestas) as Satisfaccion_Promedio
 FROM [BASADOS_DE_DATOS].BI_hecho_encuesta he
 JOIN [BASADOS_DE_DATOS].BI_dimension_tiempo t ON he.tiempo = t.id_tiempo
 JOIN [BASADOS_DE_DATOS].BI_dimension_rango_etario_agente ra ON he.rango_etario_agente = ra.id_rango_etario_agente
